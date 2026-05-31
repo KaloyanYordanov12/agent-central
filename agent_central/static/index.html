@@ -140,36 +140,53 @@
       position: relative;
       display: flex;
       justify-content: center;
-      align-items: flex-start;
-      padding: 90px 80px 70px;
+      align-items: center;
+      padding: 120px 200px 100px;
+      min-height: 600px;
       background: linear-gradient(
         to bottom,
         #7ec0e8 0%,
-        #7ec0e8 68%,
-        #4caf50 69%,
-        #4caf50 73%,
-        #6d4c2a 74%,
+        #7ec0e8 65%,
+        #4caf50 67%,
+        #4caf50 72%,
+        #6d4c2a 73%,
         #6d4c2a 100%
       );
     }
 
     .sun {
       position: absolute;
-      top: 30px;
-      right: 90px;
-      width: 50px;
-      height: 50px;
+      top: 40px;
+      right: 120px;
+      width: 60px;
+      height: 60px;
       background: #fff4a3;
       border-radius: 50%;
-      box-shadow: 0 0 36px rgba(255, 244, 163, 0.55);
+      box-shadow: 0 0 40px rgba(255, 244, 163, 0.6);
     }
 
     .building {
       position: relative;
-      border: 6px solid #6e6e6e;
-      border-top: 14px solid #4a4a4a;
+      display: inline-block;
+      border: 8px solid #6e6e6e;
+      border-top: 18px solid #4a4a4a;
       background: #1a1a2e;
-      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+    }
+
+    .status-overlay {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background: rgba(0, 0, 0, 0.75);
+      color: #ffb000;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      padding: 4px 6px;
+      z-index: 10;
+      white-space: pre-line;
+      line-height: 1.4;
+      pointer-events: none;
     }
 
     #game-container {
@@ -248,6 +265,9 @@
     <div class="world-wrapper">
       <div class="sun"></div>
       <div class="building">
+        <div class="status-overlay" id="status-overlay">AGENT: deal_hunter
+ZONE: OPERATIONS
+STATE: idle</div>
         <div id="game-container"></div>
       </div>
     </div>
@@ -301,10 +321,9 @@
       const stateLine = isOffline
         ? 'STATE: offline'
         : `STATE: ${scene.isWalking ? 'walking' : 'idle'} (${state})`;
-      scene.statusText.setText(
-        `AGENT: deal_hunter\nZONE: ${zone.label}\n${stateLine}\nACTION: ${action}`
-      );
-      scene.statusText.setColor(isOffline ? '#ff3b30' : '#ffb000');
+      const overlay = document.getElementById('status-overlay');
+      overlay.textContent = `AGENT: deal_hunter\nZONE: ${zone.label}\n${stateLine}\nACTION: ${action}`;
+      overlay.style.color = isOffline ? '#ff3b30' : '#ffb000';
 
       if (isOffline) return;
 
@@ -330,9 +349,8 @@
     function updateStatusText(scene) {
       const zone = ZONE_MAP[scene.currentZone];
       const state = scene.isWalking ? 'walking' : 'idle';
-      scene.statusText.setText(
-        `AGENT: deal_hunter\nZONE: ${zone.label}\nSTATE: ${state}`
-      );
+      const overlay = document.getElementById('status-overlay');
+      overlay.textContent = `AGENT: deal_hunter\nZONE: ${zone.label}\nSTATE: ${state}`;
     }
 
     function walkToZone(scene, zoneKey) {
@@ -426,13 +444,8 @@
         this.currentZone = 'operations';
         this.isWalking = false;
 
-        // Status overlay — amber text in top-left of the canvas.
-        this.statusText = this.add.text(8, 8, '', {
-          fontFamily: '"JetBrains Mono", monospace',
-          fontSize: '8px',
-          color: '#ffb000',
-          align: 'left',
-        }).setOrigin(0, 0);
+        // Status overlay is an HTML div (#status-overlay) updated via
+        // updateStatusText/applyAgentState — keeps it readable over a transparent canvas.
         updateStatusText(this);
 
         // Debug keyboard shortcuts — 1..5 walk Deal Hunter to each zone.
@@ -473,8 +486,9 @@
       parent: 'game-container',
       width: 656,
       height: 320,
-      zoom: 2,
-      backgroundColor: '#050505',
+      zoom: 1.5,
+      transparent: true,
+      backgroundColor: 'rgba(0, 0, 0, 0)',
       pixelArt: true,
       scene: officeScene,
     };
