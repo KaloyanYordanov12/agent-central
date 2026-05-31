@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+.env
+data/
+logs/
+tools/
+uvicorn.pid
+uvicorn_*.log
+.vscode/
+.idea/
