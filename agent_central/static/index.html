@@ -233,6 +233,56 @@
 
     const WALK_SPEED = 80; // native pixels per second
 
+    // Maps Deal Hunter pipeline states to zones for autonomous walking.
+    const STATE_TO_ZONE = {
+      scanning:        'research',
+      qualifying:      'operations',
+      author_research: 'research',
+      writing:         'writingDesk',
+      critic:          'writingDesk',
+      posting:         'communications',
+      idle:            'lounge',
+      offline:         null,
+    };
+
+    let pendingDestination = null; // queued state changes during walks
+    let isOffline = false;
+
+    function applyAgentState(scene, payload) {
+      const state = payload.state;
+      const action = payload.current_action || '';
+      isOffline = (state === 'offline');
+
+      const zone = ZONE_MAP[scene.currentZone];
+      const stateLine = isOffline
+        ? 'STATE: offline'
+        : `STATE: ${scene.isWalking ? 'walking' : 'idle'} (${state})`;
+      scene.statusText.setText(
+        `AGENT: deal_hunter\nZONE: ${zone.label}\n${stateLine}\nACTION: ${action}`
+      );
+      scene.statusText.setColor(isOffline ? '#ff3b30' : '#ffb000');
+
+      if (isOffline) return;
+
+      const targetZone = STATE_TO_ZONE[state];
+      if (!targetZone) return;
+      if (targetZone === scene.currentZone) return;
+
+      if (scene.isWalking) {
+        pendingDestination = targetZone;
+      } else {
+        walkToZone(scene, targetZone);
+      }
+    }
+
+    function consumePendingDestination(scene) {
+      if (pendingDestination && pendingDestination !== scene.currentZone) {
+        const next = pendingDestination;
+        pendingDestination = null;
+        walkToZone(scene, next);
+      }
+    }
+
     function updateStatusText(scene) {
       const zone = ZONE_MAP[scene.currentZone];
       const state = scene.isWalking ? 'walking' : 'idle';
@@ -255,6 +305,7 @@
         scene.currentZone = zoneKey;
         scene.isWalking = false;
         updateStatusText(scene);
+        consumePendingDestination(scene);
       };
 
       if (currentZoneData.floor === target.floor) {
@@ -345,6 +396,30 @@
         this.input.keyboard.on('keydown-THREE', () => walkToZone(this, 'writingDesk'));
         this.input.keyboard.on('keydown-FOUR',  () => walkToZone(this, 'lounge'));
         this.input.keyboard.on('keydown-FIVE',  () => walkToZone(this, 'research'));
+
+        // WebSocket connection to Agent Central backend — receives Deal Hunter state.
+        const scene = this;
+        let ws;
+        function connectWS() {
+          ws = new WebSocket('ws://127.0.0.1:8001/ws/status');
+          ws.onopen = () => console.log('[WS] connected');
+          ws.onmessage = (event) => {
+            try {
+              const msg = JSON.parse(event.data);
+              if (msg.type === 'status') {
+                applyAgentState(scene, msg.payload);
+              }
+            } catch (e) {
+              console.error('[WS] failed to parse message:', e);
+            }
+          };
+          ws.onclose = () => {
+            console.warn('[WS] disconnected, retrying in 3s...');
+            setTimeout(connectWS, 3000);
+          };
+          ws.onerror = (e) => console.error('[WS] error:', e);
+        }
+        connectWS();
       },
     };
 
