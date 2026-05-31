@@ -133,6 +133,45 @@
       overflow: hidden;
       min-height: 0;
     }
+
+    /* World wrapper provides sky/grass/dirt as a CSS gradient backdrop
+       around the building. Phaser canvas only renders the office interior. */
+    .world-wrapper {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 90px 80px 70px;
+      background: linear-gradient(
+        to bottom,
+        #7ec0e8 0%,
+        #7ec0e8 68%,
+        #4caf50 69%,
+        #4caf50 73%,
+        #6d4c2a 74%,
+        #6d4c2a 100%
+      );
+    }
+
+    .sun {
+      position: absolute;
+      top: 30px;
+      right: 90px;
+      width: 50px;
+      height: 50px;
+      background: #fff4a3;
+      border-radius: 50%;
+      box-shadow: 0 0 36px rgba(255, 244, 163, 0.55);
+    }
+
+    .building {
+      position: relative;
+      border: 6px solid #6e6e6e;
+      border-top: 14px solid #4a4a4a;
+      background: #1a1a2e;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+    }
+
     #game-container {
       line-height: 0;
     }
@@ -206,7 +245,12 @@
   </header>
 
   <main class="game-main">
-    <div id="game-container"></div>
+    <div class="world-wrapper">
+      <div class="sun"></div>
+      <div class="building">
+        <div id="game-container"></div>
+      </div>
+    </div>
   </main>
 
   <footer class="bottom-bar">
@@ -309,7 +353,6 @@
       };
 
       if (currentZoneData.floor === target.floor) {
-        // Same floor — walk straight across.
         const distance = Math.abs(target.x - scene.dealHunter.x);
         const duration = (distance / WALK_SPEED) * 1000;
         scene.tweens.add({
@@ -366,6 +409,9 @@
       },
       create() {
         // Rixitic example scene as the permanent office background.
+        // World layers (sky, sun, grass, dirt, walls, roof) are CSS around the
+        // canvas — see <div class="world-wrapper"> in HTML. Phaser only renders
+        // the office and character here.
         const cx = this.scale.width / 2;
         const cy = this.scale.height / 2;
         this.add.image(cx, cy, 'rixitic-example');
@@ -374,7 +420,6 @@
         this.textures.get('2dpig-characters').add('deal-hunter', 0, 2, 96, 14, 24);
 
         // Spawn Deal Hunter at the Operations zone.
-        // Bottom-center origin so the y-coordinate is the floor where the character stands.
         const startZone = ZONE_MAP.operations;
         this.dealHunter = this.add.image(startZone.x, startZone.y, '2dpig-characters', 'deal-hunter');
         this.dealHunter.setOrigin(0.5, 1);
