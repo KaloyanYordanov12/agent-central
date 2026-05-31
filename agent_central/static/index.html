@@ -215,26 +215,45 @@
   </footer>
 
   <script>
+    // ============================================================
+    // ZONE MAP — five agent zones mapped to regions of rixitic's example.png (656×320).
+    // Each zone is where a specific computational state plays out in the office.
+    // Coordinates are starting estimates; tuned visually in C-FINAL.3.
+    // ============================================================
+    const ZONE_MAP = {
+      operations:     { x: 144, y: 144, w: 146, h: 160, label: 'OPERATIONS' },
+      communications: { x: 290, y: 144, w: 220, h: 160, label: 'COMMUNICATIONS' },
+      writingDesk:    { x: 510, y: 144, w: 146, h: 160, label: 'WRITING DESK' },
+      lounge:         { x: 144, y: 168, w: 331, h: 160, label: 'LOUNGE' },
+      research:       { x: 475, y: 168, w: 181, h: 160, label: 'RESEARCH' },
+    };
+
     const officeScene = {
       key: 'OfficeScene',
       preload() {
+        // C-R.3 throwaway: load rixitic's flattened example scene for smoke test.
         this.load.image(
-          'office-sample',
-          '/static/assets/tilesets/2dpig-pixel-office/PixelOffice.png'
+          'rixitic-example',
+          '/static/assets/tilesets/rixitic-sidescroller-office/example.png'
         );
       },
       create() {
+        // Rixitic example scene as the permanent office background.
         const cx = this.scale.width / 2;
         const cy = this.scale.height / 2;
-        this.add.image(cx, cy, 'office-sample');
+        this.add.image(cx, cy, 'rixitic-example');
+
+        // Zone overlays deferred — characters will be placed in zones in Step D.
+        // ZONE_MAP constant retained at top of script for character positioning logic.
       },
     };
 
     const config = {
       type: Phaser.AUTO,
       parent: 'game-container',
-      width: 256,
-      height: 224,
+      width: 656,
+      height: 320,
+      zoom: 2,
       backgroundColor: '#050505',
       pixelArt: true,
       scene: officeScene,
