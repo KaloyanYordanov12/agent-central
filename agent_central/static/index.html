@@ -216,25 +216,101 @@
 
   <script>
     // ============================================================
-    // ZONE MAP — five agent zones mapped to regions of rixitic's example.png (656×320).
-    // Each zone is where a specific computational state plays out in the office.
-    // Coordinates are starting estimates; tuned visually in C-FINAL.3.
+    // ZONE MAP — five agent zones with (x, y) waypoints where the character stands.
+    // floor: 'upper' or 'lower' — controls elevator routing during cross-floor walks.
+    // Coordinates are estimates within the 656×320 native canvas; tune visually.
     // ============================================================
     const ZONE_MAP = {
-      operations:     { x: 144, y: 144, w: 146, h: 160, label: 'OPERATIONS' },
-      communications: { x: 290, y: 144, w: 220, h: 160, label: 'COMMUNICATIONS' },
-      writingDesk:    { x: 510, y: 144, w: 146, h: 160, label: 'WRITING DESK' },
-      lounge:         { x: 144, y: 168, w: 331, h: 160, label: 'LOUNGE' },
-      research:       { x: 475, y: 168, w: 181, h: 160, label: 'RESEARCH' },
+      operations:     { x: 90,  y: 130, floor: 'upper', label: 'OPERATIONS' },
+      communications: { x: 230, y: 130, floor: 'upper', label: 'COMMUNICATIONS' },
+      writingDesk:    { x: 420, y: 130, floor: 'upper', label: 'WRITING DESK' },
+      lounge:         { x: 130, y: 290, floor: 'lower', label: 'LOUNGE' },
+      research:       { x: 510, y: 290, floor: 'lower', label: 'RESEARCH' },
     };
+
+    const ELEVATOR_UPPER = { x: 90, y: 130 };
+    const ELEVATOR_LOWER = { x: 90, y: 290 };
+
+    const WALK_SPEED = 80; // native pixels per second
+
+    function updateStatusText(scene) {
+      const zone = ZONE_MAP[scene.currentZone];
+      const state = scene.isWalking ? 'walking' : 'idle';
+      scene.statusText.setText(
+        `AGENT: deal_hunter\nZONE: ${zone.label}\nSTATE: ${state}`
+      );
+    }
+
+    function walkToZone(scene, zoneKey) {
+      if (scene.isWalking) return;
+      const target = ZONE_MAP[zoneKey];
+      if (!target) return;
+      if (zoneKey === scene.currentZone) return;
+
+      const currentZoneData = ZONE_MAP[scene.currentZone];
+      scene.isWalking = true;
+      updateStatusText(scene);
+
+      const finishAtTarget = () => {
+        scene.currentZone = zoneKey;
+        scene.isWalking = false;
+        updateStatusText(scene);
+      };
+
+      if (currentZoneData.floor === target.floor) {
+        // Same floor — walk straight across.
+        const distance = Math.abs(target.x - scene.dealHunter.x);
+        const duration = (distance / WALK_SPEED) * 1000;
+        scene.tweens.add({
+          targets: scene.dealHunter,
+          x: target.x,
+          duration: duration,
+          ease: 'Linear',
+          onComplete: finishAtTarget,
+        });
+        return;
+      }
+
+      // Cross-floor — walk to elevator on current floor, teleport, walk to target on other floor.
+      const currentElevator = currentZoneData.floor === 'upper' ? ELEVATOR_UPPER : ELEVATOR_LOWER;
+      const otherElevator   = currentZoneData.floor === 'upper' ? ELEVATOR_LOWER : ELEVATOR_UPPER;
+
+      const distanceToElevator   = Math.abs(currentElevator.x - scene.dealHunter.x);
+      const distanceFromElevator = Math.abs(target.x - otherElevator.x);
+      const durationToElevator   = (distanceToElevator   / WALK_SPEED) * 1000;
+      const durationFromElevator = (distanceFromElevator / WALK_SPEED) * 1000;
+
+      scene.tweens.add({
+        targets: scene.dealHunter,
+        x: currentElevator.x,
+        duration: durationToElevator,
+        ease: 'Linear',
+        onComplete: () => {
+          // "Use the elevator" — teleport to the other floor's matching elevator slot.
+          scene.dealHunter.x = otherElevator.x;
+          scene.dealHunter.y = otherElevator.y;
+
+          scene.tweens.add({
+            targets: scene.dealHunter,
+            x: target.x,
+            duration: durationFromElevator,
+            ease: 'Linear',
+            onComplete: finishAtTarget,
+          });
+        },
+      });
+    }
 
     const officeScene = {
       key: 'OfficeScene',
       preload() {
-        // C-R.3 throwaway: load rixitic's flattened example scene for smoke test.
         this.load.image(
           'rixitic-example',
           '/static/assets/tilesets/rixitic-sidescroller-office/example.png'
+        );
+        this.load.image(
+          '2dpig-characters',
+          '/static/assets/tilesets/2dpig-pixel-office/PixelOfficeAssets.png'
         );
       },
       create() {
@@ -243,8 +319,32 @@
         const cy = this.scale.height / 2;
         this.add.image(cx, cy, 'rixitic-example');
 
-        // Zone overlays deferred — characters will be placed in zones in Step D.
-        // ZONE_MAP constant retained at top of script for character positioning logic.
+        // Register the dark-haired character sprite from the 2dPig sheet.
+        this.textures.get('2dpig-characters').add('deal-hunter', 0, 2, 96, 14, 24);
+
+        // Spawn Deal Hunter at the Operations zone.
+        // Bottom-center origin so the y-coordinate is the floor where the character stands.
+        const startZone = ZONE_MAP.operations;
+        this.dealHunter = this.add.image(startZone.x, startZone.y, '2dpig-characters', 'deal-hunter');
+        this.dealHunter.setOrigin(0.5, 1);
+        this.currentZone = 'operations';
+        this.isWalking = false;
+
+        // Status overlay — amber text in top-left of the canvas.
+        this.statusText = this.add.text(8, 8, '', {
+          fontFamily: '"JetBrains Mono", monospace',
+          fontSize: '8px',
+          color: '#ffb000',
+          align: 'left',
+        }).setOrigin(0, 0);
+        updateStatusText(this);
+
+        // Debug keyboard shortcuts — 1..5 walk Deal Hunter to each zone.
+        this.input.keyboard.on('keydown-ONE',   () => walkToZone(this, 'operations'));
+        this.input.keyboard.on('keydown-TWO',   () => walkToZone(this, 'communications'));
+        this.input.keyboard.on('keydown-THREE', () => walkToZone(this, 'writingDesk'));
+        this.input.keyboard.on('keydown-FOUR',  () => walkToZone(this, 'lounge'));
+        this.input.keyboard.on('keydown-FIVE',  () => walkToZone(this, 'research'));
       },
     };
 
