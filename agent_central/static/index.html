@@ -202,12 +202,14 @@
       transition: background 0.3s ease, box-shadow 0.3s ease;
     }
 
-    /* X anchored above each clickable's horizontal center; Y normalized to one
-       height per floor for a consistent row of dots. */
-    /* Upper-floor LEDs all at top: 50px for consistent visual height */
-    #zone-led-operations    { left: 484px; top: 50px; }   /* above REPORTS whiteboard */
-    #zone-led-communications { left: 622px; top: 50px; }  /* above TEAMWORK whiteboard */
-    #zone-led-writingDesk   { left: 826px; top: 50px; }   /* above Window */
+    /* X anchored to each element's MEASURED visual center (from the source image),
+       not the hitbox center — removes the slight rightward bias. Y normalized to
+       one height per floor. Upper centers (native): REPORTS 320, TEAMWORK 408,
+       Window 544. left = center*1.5 - 4 (half the 8px dot). */
+    /* Upper-floor LEDs all at top: 85px (just above the whiteboards) */
+    #zone-led-operations    { left: 476px; top: 85px; }   /* above REPORTS whiteboard */
+    #zone-led-communications { left: 608px; top: 85px; }  /* above TEAMWORK whiteboard */
+    #zone-led-writingDesk   { left: 812px; top: 85px; }   /* above Window */
 
     /* Lower-floor LEDs all at top: 360px for consistent visual height */
     #zone-led-lounge        { left: 904px; top: 360px; }  /* above Water cooler */
