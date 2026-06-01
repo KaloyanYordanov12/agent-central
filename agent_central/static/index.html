@@ -181,52 +181,80 @@
       image-rendering: crisp-edges;
     }
 
-    /* Terminal-style popup for clickable office elements (F.2b) */
+    /* Parchment quest-screen popup for clickable office elements (F.2b tune) */
+    /* Corner ornaments from the spec are intentionally omitted: the box-shadow
+       corner trick used percentage offsets (invalid in box-shadow), so only one
+       square would render. Per the fallback, we ship without corner squares. */
     .popup {
       position: fixed;
-      background: rgba(0, 0, 0, 0.92);
-      border: 2px solid #ffb000;
-      color: #ffb000;
+      background:
+        radial-gradient(ellipse at center, #f4e3b8 0%, #ecd9a0 100%);
+      border: 3px solid #5a3e1f;
+      color: #3a2817;
       font-family: 'JetBrains Mono', monospace;
       font-size: 11px;
-      padding: 12px 14px;
-      padding-right: 28px;
-      min-width: 220px;
-      max-width: 320px;
+      padding: 16px 18px;
+      padding-right: 32px;
+      min-width: 240px;
+      max-width: 340px;
       z-index: 1000;
       white-space: pre-line;
-      line-height: 1.5;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
-      letter-spacing: 0.3px;
+      line-height: 1.6;
+      box-shadow:
+        /* Inner cream inset to form a double-line border */
+        inset 0 0 0 2px #d9c489,
+        /* Outer drop shadow grounding the popup on the world */
+        0 6px 18px rgba(0, 0, 0, 0.45),
+        0 2px 4px rgba(58, 40, 23, 0.3);
+      letter-spacing: 0.2px;
+      border-radius: 2px;
     }
 
     .popup-close {
       position: absolute;
-      top: 4px;
-      right: 6px;
-      background: transparent;
-      border: none;
-      color: #ffb000;
+      top: 6px;
+      right: 8px;
+      background: #d9c489;
+      border: 2px solid #5a3e1f;
+      color: #5a3e1f;
       font-family: 'JetBrains Mono', monospace;
-      font-size: 18px;
+      font-size: 14px;
+      font-weight: 700;
       cursor: pointer;
       padding: 0;
-      width: 20px;
-      height: 20px;
+      width: 22px;
+      height: 22px;
       line-height: 1;
+      border-radius: 50%;
+      transition: background 0.15s, color 0.15s;
     }
 
     .popup-close:hover {
-      color: #ff3b30;
+      background: #a02828;
+      color: #f4e3b8;
     }
 
     .popup-title {
-      color: #ffb000;
+      color: #5a3e1f;
       font-weight: 700;
       letter-spacing: 1px;
-      margin-bottom: 6px;
-      padding-bottom: 4px;
-      border-bottom: 1px solid rgba(255, 176, 0, 0.3);
+      font-size: 13px;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #8b6534;
+      position: relative;
+    }
+
+    /* Decorative underline below title — a second thinner brown line for double-band effect */
+    .popup-title::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -4px;
+      height: 1px;
+      background: #8b6534;
+      opacity: 0.5;
     }
   </style>
 </head>
