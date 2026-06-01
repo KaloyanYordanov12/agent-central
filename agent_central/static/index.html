@@ -439,6 +439,16 @@ STATE: idle</div>
         html = buildWhiteboardPopup();
       } else if (type === 'workstation') {
         html = buildWorkstationPopup();
+      } else if (type === 'waterCooler') {
+        html = buildWaterCoolerPopup();
+      } else if (type === 'elevator') {
+        html = buildElevatorPopup();
+      } else if (type === 'teamwork') {
+        html = buildTeamworkPopup();
+      } else if (type === 'window') {
+        html = buildWindowPopup();
+      } else if (type === 'printer') {
+        html = buildPrinterPopup();
       }
 
       content.innerHTML = html;
@@ -509,6 +519,102 @@ EQUIPMENT:
       `.trim();
     }
 
+    // Water cooler — easter egg with a random "agent thought".
+    function buildWaterCoolerPopup() {
+      const thoughts = [
+        "Should have used PRAW instead of raw HTTP for Reddit. Lesson learned.",
+        "73 DMs sent. 4 replies. Better than industry average. Keep grinding.",
+        "Is Kolio actually going to ship this or just keep polishing the UI?",
+        "If I could drink coffee, this would be cup five.",
+        "Wonder what the other agents are doing. Oh wait, there are no other agents yet.",
+        "Note to self: r/SaaS is gold. r/Entrepreneur is mostly noise.",
+        "Misho's LinkedIn outreach numbers were impressive last week.",
+        "Three clients at retainer = survival. Twelve = comfort. Twenty = real business.",
+        "The Hetzner VPS is cheaper than I expected. Good call.",
+        "Idle is fine. Idle is recovery. Idle is honest."
+      ];
+      const random = thoughts[Math.floor(Math.random() * thoughts.length)];
+      return `
+<div class="popup-title">WATER COOLER</div>
+Agent overheard thinking:
+
+"${random}"
+      `.trim();
+    }
+
+    // Elevator — system info / infrastructure status.
+    function buildElevatorPopup() {
+      return `
+<div class="popup-title">SYSTEM INFO</div>
+AGENT CENTRAL  v0.1.0
+DEAL HUNTER    v0.1.0
+
+SERVICES:
+  Dashboard  :8000  online
+  Command    :8001  online
+  Scanner    daemon online
+
+INFRASTRUCTURE:
+  Host:       Hetzner CX23
+  OS:         Ubuntu 24.04
+  Status:     operational
+      `.trim();
+    }
+
+    // TEAMWORK whiteboard — team/agent roster overview.
+    function buildTeamworkPopup() {
+      return `
+<div class="popup-title">TEAM OVERVIEW</div>
+ACTIVE AGENTS:  1
+TOTAL AGENTS:   1
+CAPACITY:       10 slots
+
+ROSTER:
+  [01] Deal Hunter    Reddit lead scout
+  [02] --             slot available
+  [03] --             slot available
+  [04] --             slot available
+  [05] --             slot available
+
+NEXT HIRE:
+  Closer        cold email reply handler
+      `.trim();
+    }
+
+    // Window — outside world / API health status.
+    function buildWindowPopup() {
+      return `
+<div class="popup-title">OUTSIDE WORLD</div>
+External services:
+
+REDDIT API     accessible
+ANTHROPIC API  responding
+BRAVE SEARCH   responding
+GITHUB         operational
+
+LAST CHECK:    just now
+NETWORK:       stable
+LATENCY:       ~80ms avg
+      `.trim();
+    }
+
+    // Printer/copier — recent output log.
+    function buildPrinterPopup() {
+      return `
+<div class="popup-title">PRINTER QUEUE</div>
+RECENT OUTPUT:
+
+  [11:42] DM draft → u/raincity87
+  [11:38] Lead report → r/SaaS scan
+  [11:24] DM draft → u/Tekelpath
+  [11:18] Status report → cycle 47
+
+QUEUE:         0 pending
+LAST ACTIVITY: just now
+TONER:         operational
+      `.trim();
+    }
+
     // Wire up close button + click-outside-to-close.
     document.getElementById('popup-close').addEventListener('click', hidePopup);
 
@@ -574,6 +680,47 @@ EQUIPMENT:
         workstation.setInteractive({ cursor: 'pointer', useHandCursor: true });
         workstation.on('pointerdown', (pointer) => {
           showPopup('workstation', pointer.event);
+        });
+
+        // --- F.2c: five more clickable elements (coords tuned to image) ---
+        // Water cooler hitbox (right side of lower floor).
+        const waterCooler = this.add.zone(590, 250, 30, 50);
+        waterCooler.setOrigin(0, 0);
+        waterCooler.setInteractive({ cursor: 'pointer', useHandCursor: true });
+        waterCooler.on('pointerdown', (pointer) => {
+          showPopup('waterCooler', pointer.event);
+        });
+
+        // Elevator hitbox (lower floor, left side — the gray elevator door).
+        const elevator = this.add.zone(80, 240, 40, 52);
+        elevator.setOrigin(0, 0);
+        elevator.setInteractive({ cursor: 'pointer', useHandCursor: true });
+        elevator.on('pointerdown', (pointer) => {
+          showPopup('elevator', pointer.event);
+        });
+
+        // TEAMWORK whiteboard hitbox (upper floor, right of REPORTS).
+        const teamwork = this.add.zone(376, 56, 82, 48);
+        teamwork.setOrigin(0, 0);
+        teamwork.setInteractive({ cursor: 'pointer', useHandCursor: true });
+        teamwork.on('pointerdown', (pointer) => {
+          showPopup('teamwork', pointer.event);
+        });
+
+        // Window hitbox (upper floor, far right — dual window panels).
+        const window_ = this.add.zone(474, 46, 158, 66);
+        window_.setOrigin(0, 0);
+        window_.setInteractive({ cursor: 'pointer', useHandCursor: true });
+        window_.on('pointerdown', (pointer) => {
+          showPopup('window', pointer.event);
+        });
+
+        // Printer/copier hitbox (lower floor, left of the cubicles).
+        const printer = this.add.zone(298, 255, 38, 38);
+        printer.setOrigin(0, 0);
+        printer.setInteractive({ cursor: 'pointer', useHandCursor: true });
+        printer.on('pointerdown', (pointer) => {
+          showPopup('printer', pointer.event);
         });
 
         // Status overlay is an HTML div (#status-overlay) updated via
