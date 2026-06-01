@@ -184,6 +184,90 @@
       min-width: 180px;
     }
 
+    /* Monitor glow overlays — positioned over the cubicle monitors on the canvas.
+       Coords are in display space (native 656x320 * zoom 1.5). The overlays are
+       absolutely positioned inside .building, so their origin is the canvas
+       (game-container) top-left. Invisible by default; state classes add glow. */
+    .monitor-glow {
+      position: absolute;
+      width: 27px;
+      height: 21px;
+      pointer-events: none;
+      z-index: 5;
+      opacity: 0;
+      transition: opacity 0.4s ease-in-out;
+      border-radius: 1px;
+    }
+
+    /* Display coords: native monitor top-lefts (369,252)/(431,252)/(494,252) * 1.5.
+       Tuned to the rixitic image's three lower-floor cubicle screens. */
+    #monitor-1 { left: 554px; top: 378px; }
+    #monitor-2 { left: 646px; top: 378px; }
+    #monitor-3 { left: 741px; top: 378px; }
+
+    /* State styles — applied via JS adding classes to all .monitor-glow elements */
+    .monitor-glow.state-scanning,
+    .monitor-glow.state-operations {
+      opacity: 1;
+      background: #5cb6ff;
+      box-shadow: 0 0 8px 2px rgba(92, 182, 255, 0.7);
+      animation: monitor-pulse-slow 3s ease-in-out infinite;
+    }
+
+    .monitor-glow.state-qualifying {
+      opacity: 1;
+      background: #ffb000;
+      box-shadow: 0 0 8px 2px rgba(255, 176, 0, 0.7);
+      animation: monitor-pulse-medium 2s ease-in-out infinite;
+    }
+
+    .monitor-glow.state-researching,
+    .monitor-glow.state-research,
+    .monitor-glow.state-author_research {
+      opacity: 1;
+      background: #4caf50;
+      box-shadow: 0 0 8px 2px rgba(76, 175, 80, 0.7);
+      /* steady, no pulse */
+    }
+
+    .monitor-glow.state-writing {
+      opacity: 1;
+      background: #d050ff;
+      box-shadow: 0 0 8px 2px rgba(208, 80, 255, 0.7);
+      animation: monitor-pulse-fast 1.2s ease-in-out infinite;
+    }
+
+    .monitor-glow.state-posting {
+      opacity: 1;
+      background: #00e5ff;
+      box-shadow: 0 0 8px 2px rgba(0, 229, 255, 0.7);
+      animation: monitor-flash 0.6s steps(2, end) infinite;
+    }
+
+    .monitor-glow.state-critic {
+      opacity: 1;
+      background: #fff200;
+      box-shadow: 0 0 8px 2px rgba(255, 242, 0, 0.7);
+      animation: monitor-pulse-medium 2s ease-in-out infinite;
+    }
+
+    @keyframes monitor-pulse-slow {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    @keyframes monitor-pulse-medium {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    @keyframes monitor-pulse-fast {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.55; }
+    }
+    @keyframes monitor-flash {
+      0%, 50% { opacity: 1; }
+      50.01%, 100% { opacity: 0.3; }
+    }
+
     #game-container {
       line-height: 0;
     }
@@ -280,6 +364,11 @@
 ZONE: OPERATIONS
 STATE: idle</div>
       <div id="game-container"></div>
+
+      <!-- Monitor glow overlays (display coords over the canvas) -->
+      <div class="monitor-glow" id="monitor-1" data-monitor="1"></div>
+      <div class="monitor-glow" id="monitor-2" data-monitor="2"></div>
+      <div class="monitor-glow" id="monitor-3" data-monitor="3"></div>
     </div>
   </div>
 
@@ -335,6 +424,8 @@ STATE: idle</div>
       overlay.textContent = `AGENT: deal_hunter\nZONE: ${zone.label}\n${stateLine}\nACTION: ${action}`;
       overlay.style.color = isOffline ? '#ff3b30' : '#f4f0e0';
 
+      setMonitorState(isOffline ? 'idle' : state);
+
       if (isOffline) return;
 
       const targetZone = STATE_TO_ZONE[state];
@@ -346,6 +437,36 @@ STATE: idle</div>
       } else {
         walkToZone(scene, targetZone);
       }
+    }
+
+    // Update monitor glow overlays based on agent state. Called from both
+    // applyAgentState (WebSocket) and updateStatusText (keyboard zone changes).
+    function setMonitorState(state) {
+      const monitors = document.querySelectorAll('.monitor-glow');
+      monitors.forEach(monitor => {
+        const classesToRemove = [];
+        monitor.classList.forEach(cls => {
+          if (cls.startsWith('state-')) classesToRemove.push(cls);
+        });
+        classesToRemove.forEach(cls => monitor.classList.remove(cls));
+
+        if (state && state !== 'idle' && state !== 'lounge') {
+          monitor.classList.add('state-' + state);
+        }
+      });
+    }
+
+    // Maps a zone key to the agent state it implies (for keyboard-driven changes).
+    function zoneToState(zoneKey) {
+      const map = {
+        'operations': 'scanning',
+        'qualifying': 'qualifying',
+        'research': 'researching',
+        'writing': 'writing',
+        'posting': 'posting',
+        'lounge': 'idle',
+      };
+      return map[zoneKey] || 'idle';
     }
 
     function consumePendingDestination(scene) {
@@ -361,6 +482,7 @@ STATE: idle</div>
       const state = scene.isWalking ? 'walking' : 'idle';
       const overlay = document.getElementById('status-overlay');
       overlay.textContent = `AGENT: deal_hunter\nZONE: ${zone.label}\nSTATE: ${state}`;
+      setMonitorState(zoneToState(scene.currentZone));
     }
 
     function walkToZone(scene, zoneKey) {
