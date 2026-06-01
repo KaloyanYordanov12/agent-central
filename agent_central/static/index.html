@@ -41,42 +41,29 @@
       font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Monaco, 'Courier New', monospace;
     }
 
-    /* World wrapper fills the viewport — sky/grass/dirt as a CSS gradient. */
+    /* World wrapper fills the viewport — backdrop image provides sky, lawn,
+       fountain, city skyline, and a contextual corporate building on the right. */
     .world-wrapper {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: linear-gradient(
-        to bottom,
-        #7ec0e8 0%,
-        #7ec0e8 65%,
-        #4caf50 67%,
-        #4caf50 72%,
-        #6d4c2a 73%,
-        #6d4c2a 100%
-      );
+      background-image: url('/static/assets/world/backdrop.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-color: #7ec0e8; /* fallback while image loads */
     }
 
-    .sun {
-      position: absolute;
-      top: 40px;
-      right: 120px;
-      width: 60px;
-      height: 60px;
-      background: #fff4a3;
-      border-radius: 50%;
-      box-shadow: 0 0 40px rgba(255, 244, 163, 0.6);
-    }
-
+    /* Rixitic building positioned over the left-center area (fountain/lawn).
+       The image's own corporate building (right side) becomes contextual scenery. */
     .building {
-      position: relative;
+      position: absolute;
+      left: 32%;
+      top: 50%;
+      transform: translate(-50%, -50%);
       display: inline-block;
-      margin-top: 80px;
       border: 12px solid #6e6e6e;
       border-top: 22px solid #4a4a4a;
       background:
@@ -165,7 +152,6 @@
 <body>
 
   <div class="world-wrapper">
-    <div class="sun"></div>
     <div class="building">
       <div class="building-sign">AGENT CENTRAL</div>
       <div class="status-overlay" id="status-overlay">AGENT: deal_hunter
