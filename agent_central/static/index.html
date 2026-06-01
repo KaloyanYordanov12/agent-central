@@ -180,6 +180,54 @@
       image-rendering: -moz-crisp-edges;
       image-rendering: crisp-edges;
     }
+
+    /* Terminal-style popup for clickable office elements (F.2b) */
+    .popup {
+      position: fixed;
+      background: rgba(0, 0, 0, 0.92);
+      border: 2px solid #ffb000;
+      color: #ffb000;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 12px 14px;
+      padding-right: 28px;
+      min-width: 220px;
+      max-width: 320px;
+      z-index: 1000;
+      white-space: pre-line;
+      line-height: 1.5;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+      letter-spacing: 0.3px;
+    }
+
+    .popup-close {
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      background: transparent;
+      border: none;
+      color: #ffb000;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 0;
+      width: 20px;
+      height: 20px;
+      line-height: 1;
+    }
+
+    .popup-close:hover {
+      color: #ff3b30;
+    }
+
+    .popup-title {
+      color: #ffb000;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(255, 176, 0, 0.3);
+    }
   </style>
 </head>
 <body>
@@ -192,6 +240,11 @@ ZONE: OPERATIONS
 STATE: idle</div>
       <div id="game-container"></div>
     </div>
+  </div>
+
+  <div class="popup" id="popup" style="display: none;">
+    <button class="popup-close" id="popup-close">×</button>
+    <div class="popup-content" id="popup-content"></div>
   </div>
 
   <script>
@@ -329,6 +382,104 @@ STATE: idle</div>
       });
     }
 
+    // ============================================================
+    // CLICKABLE OFFICE ELEMENTS (F.2b) — terminal-style popups.
+    // Called by Phaser pointerdown handlers in create(); mouseEvent is
+    // the native DOM event (clientX/clientY) used for positioning.
+    // ============================================================
+    function showPopup(type, mouseEvent) {
+      const popup = document.getElementById('popup');
+      const content = document.getElementById('popup-content');
+
+      let html = '';
+      if (type === 'character') {
+        html = buildCharacterPopup();
+      } else if (type === 'whiteboard') {
+        html = buildWhiteboardPopup();
+      } else if (type === 'workstation') {
+        html = buildWorkstationPopup();
+      }
+
+      content.innerHTML = html;
+      popup.style.display = 'block';
+
+      positionPopup(popup, mouseEvent);
+    }
+
+    function positionPopup(popup, mouseEvent) {
+      const x = mouseEvent.clientX + 12;
+      const y = mouseEvent.clientY + 12;
+      const popupRect = popup.getBoundingClientRect();
+      const maxX = window.innerWidth - popupRect.width - 10;
+      const maxY = window.innerHeight - popupRect.height - 10;
+      popup.style.left = Math.min(x, maxX) + 'px';
+      popup.style.top = Math.min(y, maxY) + 'px';
+    }
+
+    function hidePopup() {
+      document.getElementById('popup').style.display = 'none';
+    }
+
+    // Character popup — uses live data from the status overlay (kept current by applyAgentState).
+    function buildCharacterPopup() {
+      const overlay = document.getElementById('status-overlay').textContent;
+      return `
+<div class="popup-title">AGENT PROFILE</div>
+NAME:    Deal Hunter
+ROLE:    Reddit lead scout
+STATUS:  Active
+${overlay}
+
+CYCLES:  --
+UPTIME:  --
+      `.trim();
+    }
+
+    // Whiteboard popup — hardcoded placeholder data.
+    function buildWhiteboardPopup() {
+      return `
+<div class="popup-title">REPORTS BOARD</div>
+SCANS RUN:       47
+LEADS FOUND:     12
+SUCCESS RATE:    25.5%
+LAST SCAN:       2 min ago
+
+ACTIVE SUBREDDITS:
+  r/Entrepreneur
+  r/smallbusiness
+  r/SaaS
+  r/marketing
+      `.trim();
+    }
+
+    // Workstation popup — hardcoded placeholder data.
+    function buildWorkstationPopup() {
+      return `
+<div class="popup-title">WORKSTATION 01</div>
+ASSIGNED:    Deal Hunter
+CURRENT TASK: idle
+LAST ACTIVITY: scanning r/SaaS
+QUEUE:       3 pending leads
+
+EQUIPMENT:
+  Monitor:   active
+  Keyboard:  active
+  Status:    operational
+      `.trim();
+    }
+
+    // Wire up close button + click-outside-to-close.
+    document.getElementById('popup-close').addEventListener('click', hidePopup);
+
+    document.addEventListener('click', (e) => {
+      const popup = document.getElementById('popup');
+      if (popup.style.display === 'none') return;
+      if (popup.contains(e.target)) return;
+      // Click on the game canvas is handled by Phaser (it may open a popup) — don't close here.
+      if (e.target.tagName === 'CANVAS') return;
+      hidePopup();
+    });
+
     const officeScene = {
       key: 'OfficeScene',
       preload() {
@@ -359,6 +510,30 @@ STATE: idle</div>
         this.dealHunter.setOrigin(0.5, 1);
         this.currentZone = 'operations';
         this.isWalking = false;
+
+        // --- Clickable office elements (F.2b) ---
+        // Coords are in native rixitic-image space (656×320); the image fills the canvas.
+        // Make the character clickable -> agent profile popup.
+        this.dealHunter.setInteractive({ cursor: 'pointer', useHandCursor: true });
+        this.dealHunter.on('pointerdown', (pointer) => {
+          showPopup('character', pointer.event);
+        });
+
+        // Whiteboard hitbox (REPORTS whiteboard on upper floor) — tuned to image.
+        const whiteboard = this.add.zone(290, 58, 70, 45);
+        whiteboard.setOrigin(0, 0);
+        whiteboard.setInteractive({ cursor: 'pointer', useHandCursor: true });
+        whiteboard.on('pointerdown', (pointer) => {
+          showPopup('whiteboard', pointer.event);
+        });
+
+        // Workstation hitbox (leftmost cubicle on lower floor) — tuned to image.
+        const workstation = this.add.zone(345, 250, 60, 45);
+        workstation.setOrigin(0, 0);
+        workstation.setInteractive({ cursor: 'pointer', useHandCursor: true });
+        workstation.on('pointerdown', (pointer) => {
+          showPopup('workstation', pointer.event);
+        });
 
         // Status overlay is an HTML div (#status-overlay) updated via
         // updateStatusText/applyAgentState — keeps it readable over a transparent canvas.
