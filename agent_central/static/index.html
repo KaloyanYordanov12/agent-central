@@ -156,19 +156,32 @@
     .building-sign::before { left: 20%; }
     .building-sign::after  { right: 20%; }
 
+    /* Status overlay — navy mounted plaque matching the AGENT CENTRAL sign.
+       Corner "screws" from the spec are omitted (fallback): the box-shadow
+       corner trick used percentage offsets, invalid in box-shadow, so only
+       left-side dots would render. The plaque reads cleanly without them. */
     .status-overlay {
       position: absolute;
       top: 30px;
       left: 16px;
-      background: rgba(0, 0, 0, 0.75);
-      color: #ffb000;
+      background: #243845;
+      color: #f4f0e0;
       font-family: 'JetBrains Mono', monospace;
       font-size: 10px;
-      padding: 4px 6px;
+      padding: 8px 12px;
       z-index: 10;
       white-space: pre-line;
-      line-height: 1.4;
+      line-height: 1.5;
+      letter-spacing: 0.3px;
       pointer-events: none;
+      border: 2px solid #1a2935;
+      border-radius: 2px;
+      box-shadow:
+        /* Inner subtle highlight at top for "mounted plaque" feel */
+        inset 0 1px 0 rgba(244, 240, 224, 0.08),
+        /* Outer drop shadow grounding it on the office wall */
+        0 2px 6px rgba(0, 0, 0, 0.4);
+      min-width: 180px;
     }
 
     #game-container {
@@ -320,7 +333,7 @@ STATE: idle</div>
         : `STATE: ${scene.isWalking ? 'walking' : 'idle'} (${state})`;
       const overlay = document.getElementById('status-overlay');
       overlay.textContent = `AGENT: deal_hunter\nZONE: ${zone.label}\n${stateLine}\nACTION: ${action}`;
-      overlay.style.color = isOffline ? '#ff3b30' : '#ffb000';
+      overlay.style.color = isOffline ? '#ff3b30' : '#f4f0e0';
 
       if (isOffline) return;
 
