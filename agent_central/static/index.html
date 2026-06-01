@@ -184,102 +184,101 @@
       min-width: 180px;
     }
 
-    /* Monitor glow overlays — positioned over the cubicle monitors on the canvas.
-       Coords are in display space (native 656x320 * zoom 1.5). The overlays are
-       absolutely positioned inside .building, so their origin is the canvas
-       (game-container) top-left. Invisible by default; state classes add glow. */
-    .monitor-glow {
+    /* Cubicle LED status indicators — small lit dots above each workstation.
+       Signals current agent activity without competing with the office art.
+       Coords are display space (native ×1.5), absolute positioned inside .building. */
+    .cubicle-led {
       position: absolute;
-      width: 27px;
-      height: 21px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
       pointer-events: none;
       z-index: 5;
-      opacity: 0;
-      transition: opacity 0.4s ease-in-out;
-      border-radius: 1px;
+      /* Default (idle): dim, no glow */
+      background: #2a3340;
+      border: 1px solid #1a1f28;
+      box-shadow: none;
+      transition: background 0.3s ease, box-shadow 0.3s ease;
     }
 
-    /* Display coords: native monitor top-lefts (369,252)/(431,252)/(494,252) * 1.5.
-       Tuned to the rixitic image's three lower-floor cubicle screens. */
-    #monitor-1 { left: 554px; top: 378px; }
-    #monitor-2 { left: 646px; top: 378px; }
-    #monitor-3 { left: 741px; top: 378px; }
+    #cubicle-led-1 { left: 565px; top: 360px; }
+    #cubicle-led-2 { left: 658px; top: 360px; }
+    #cubicle-led-3 { left: 753px; top: 360px; }
 
-    /* Refined monitor glow — screen-like effect instead of solid sticker.
-       Lower opacity fill, gradient suggesting a lit display,
-       stronger outer glow for visibility. */
-    .monitor-glow.state-scanning,
-    .monitor-glow.state-operations {
-      opacity: 0.7;
-      background: radial-gradient(ellipse at center, #7cc8ff 0%, #3a8acc 90%);
+    /* Active states */
+    .cubicle-led.state-scanning,
+    .cubicle-led.state-operations {
+      background: #5cb6ff;
+      border-color: #7cc8ff;
       box-shadow:
-        0 0 4px 1px rgba(92, 182, 255, 0.6),
-        0 0 12px 3px rgba(92, 182, 255, 0.4);
-      animation: monitor-pulse-slow 3s ease-in-out infinite;
+        0 0 4px 1px rgba(92, 182, 255, 0.9),
+        0 0 10px 3px rgba(92, 182, 255, 0.5);
+      animation: led-pulse-slow 2.5s ease-in-out infinite;
     }
 
-    .monitor-glow.state-qualifying {
-      opacity: 0.75;
-      background: radial-gradient(ellipse at center, #ffd060 0%, #cc8800 90%);
+    .cubicle-led.state-qualifying {
+      background: #ffb000;
+      border-color: #ffd060;
       box-shadow:
-        0 0 4px 1px rgba(255, 176, 0, 0.6),
-        0 0 12px 3px rgba(255, 176, 0, 0.4);
-      animation: monitor-pulse-medium 2s ease-in-out infinite;
+        0 0 4px 1px rgba(255, 176, 0, 0.9),
+        0 0 10px 3px rgba(255, 176, 0, 0.5);
+      animation: led-pulse-medium 1.8s ease-in-out infinite;
     }
 
-    .monitor-glow.state-researching,
-    .monitor-glow.state-research,
-    .monitor-glow.state-author_research {
-      opacity: 0.7;
-      background: radial-gradient(ellipse at center, #80e090 0%, #2e8a3e 90%);
+    .cubicle-led.state-researching,
+    .cubicle-led.state-research,
+    .cubicle-led.state-author_research {
+      background: #4caf50;
+      border-color: #80e090;
       box-shadow:
-        0 0 4px 1px rgba(76, 175, 80, 0.6),
-        0 0 12px 3px rgba(76, 175, 80, 0.4);
+        0 0 4px 1px rgba(76, 175, 80, 0.9),
+        0 0 10px 3px rgba(76, 175, 80, 0.5);
       /* steady, no pulse */
     }
 
-    .monitor-glow.state-writing {
-      opacity: 0.75;
-      background: radial-gradient(ellipse at center, #e088ff 0%, #9a30bb 90%);
+    .cubicle-led.state-writing {
+      background: #d050ff;
+      border-color: #e088ff;
       box-shadow:
-        0 0 4px 1px rgba(208, 80, 255, 0.6),
-        0 0 12px 3px rgba(208, 80, 255, 0.4);
-      animation: monitor-pulse-fast 1.2s ease-in-out infinite;
+        0 0 4px 1px rgba(208, 80, 255, 0.9),
+        0 0 10px 3px rgba(208, 80, 255, 0.5);
+      animation: led-pulse-fast 1s ease-in-out infinite;
     }
 
-    .monitor-glow.state-posting {
-      opacity: 0.8;
-      background: radial-gradient(ellipse at center, #80f5ff 0%, #00b8cc 90%);
+    .cubicle-led.state-posting {
+      background: #00e5ff;
+      border-color: #80f5ff;
       box-shadow:
-        0 0 4px 1px rgba(0, 229, 255, 0.7),
-        0 0 12px 3px rgba(0, 229, 255, 0.4);
-      animation: monitor-flash 0.6s steps(2, end) infinite;
+        0 0 4px 1px rgba(0, 229, 255, 1),
+        0 0 10px 3px rgba(0, 229, 255, 0.6);
+      animation: led-flash 0.5s steps(2, end) infinite;
     }
 
-    .monitor-glow.state-critic {
-      opacity: 0.75;
-      background: radial-gradient(ellipse at center, #fff880 0%, #ccbb00 90%);
+    .cubicle-led.state-critic {
+      background: #fff200;
+      border-color: #fff880;
       box-shadow:
-        0 0 4px 1px rgba(255, 242, 0, 0.6),
-        0 0 12px 3px rgba(255, 242, 0, 0.4);
-      animation: monitor-pulse-medium 2s ease-in-out infinite;
+        0 0 4px 1px rgba(255, 242, 0, 0.9),
+        0 0 10px 3px rgba(255, 242, 0, 0.5);
+      animation: led-pulse-medium 1.8s ease-in-out infinite;
     }
 
-    @keyframes monitor-pulse-slow {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
-    @keyframes monitor-pulse-medium {
+    /* Animations — sharper pulses to feel like actual LEDs */
+    @keyframes led-pulse-slow {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
     }
-    @keyframes monitor-pulse-fast {
+    @keyframes led-pulse-medium {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.55; }
+      50% { opacity: 0.6; }
     }
-    @keyframes monitor-flash {
-      0%, 50% { opacity: 1; }
-      50.01%, 100% { opacity: 0.3; }
+    @keyframes led-pulse-fast {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.65; }
+    }
+    @keyframes led-flash {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0.3; }
     }
 
     #game-container {
@@ -379,10 +378,10 @@ ZONE: OPERATIONS
 STATE: idle</div>
       <div id="game-container"></div>
 
-      <!-- Monitor glow overlays (display coords over the canvas) -->
-      <div class="monitor-glow" id="monitor-1" data-monitor="1"></div>
-      <div class="monitor-glow" id="monitor-2" data-monitor="2"></div>
-      <div class="monitor-glow" id="monitor-3" data-monitor="3"></div>
+      <!-- LED status indicators above each cubicle (F.2c-anim redo) -->
+      <div class="cubicle-led" id="cubicle-led-1"></div>
+      <div class="cubicle-led" id="cubicle-led-2"></div>
+      <div class="cubicle-led" id="cubicle-led-3"></div>
     </div>
   </div>
 
@@ -504,16 +503,16 @@ STATE: idle</div>
     // Update monitor glow overlays based on agent state. Called from both
     // applyAgentState (WebSocket) and updateStatusText (keyboard zone changes).
     function setMonitorState(state) {
-      const monitors = document.querySelectorAll('.monitor-glow');
-      monitors.forEach(monitor => {
+      const leds = document.querySelectorAll('.cubicle-led');
+      leds.forEach(led => {
         const classesToRemove = [];
-        monitor.classList.forEach(cls => {
+        led.classList.forEach(cls => {
           if (cls.startsWith('state-')) classesToRemove.push(cls);
         });
-        classesToRemove.forEach(cls => monitor.classList.remove(cls));
+        classesToRemove.forEach(cls => led.classList.remove(cls));
 
         if (state && state !== 'idle' && state !== 'lounge') {
-          monitor.classList.add('state-' + state);
+          led.classList.add('state-' + state);
         }
       });
     }
