@@ -184,10 +184,11 @@
       min-width: 180px;
     }
 
-    /* Cubicle LED status indicators — small lit dots above each workstation.
-       Signals current agent activity without competing with the office art.
-       Coords are display space (native ×1.5), absolute positioned inside .building. */
-    .cubicle-led {
+    /* Zone LED status indicators — one small lit dot above where the character
+       stands in each zone. Only the active zone's LED lights up. Coords are
+       display space: native (x,y) from ZONE_MAP * 1.5, top offset ~50px up to
+       sit above the character's head; left centered (-4) for the 8px dot. */
+    .zone-led {
       position: absolute;
       width: 8px;
       height: 8px;
@@ -201,13 +202,16 @@
       transition: background 0.3s ease, box-shadow 0.3s ease;
     }
 
-    #cubicle-led-1 { left: 565px; top: 360px; }
-    #cubicle-led-2 { left: 658px; top: 360px; }
-    #cubicle-led-3 { left: 753px; top: 360px; }
+    /* Positions derived from ZONE_MAP (native -> display *1.5, top = y*1.5 - 50). */
+    #zone-led-operations    { left: 131px; top: 145px; }  /* native (90,130) upper */
+    #zone-led-communications { left: 341px; top: 145px; } /* native (230,130) upper */
+    #zone-led-writingDesk   { left: 626px; top: 145px; }  /* native (420,130) upper */
+    #zone-led-lounge        { left: 191px; top: 385px; }  /* native (130,290) lower */
+    #zone-led-research      { left: 761px; top: 385px; }  /* native (510,290) lower */
 
     /* Active states */
-    .cubicle-led.state-scanning,
-    .cubicle-led.state-operations {
+    .zone-led.state-scanning,
+    .zone-led.state-operations {
       background: #5cb6ff;
       border-color: #7cc8ff;
       box-shadow:
@@ -216,7 +220,7 @@
       animation: led-pulse-slow 2.5s ease-in-out infinite;
     }
 
-    .cubicle-led.state-qualifying {
+    .zone-led.state-qualifying {
       background: #ffb000;
       border-color: #ffd060;
       box-shadow:
@@ -225,9 +229,9 @@
       animation: led-pulse-medium 1.8s ease-in-out infinite;
     }
 
-    .cubicle-led.state-researching,
-    .cubicle-led.state-research,
-    .cubicle-led.state-author_research {
+    .zone-led.state-researching,
+    .zone-led.state-research,
+    .zone-led.state-author_research {
       background: #4caf50;
       border-color: #80e090;
       box-shadow:
@@ -236,7 +240,7 @@
       /* steady, no pulse */
     }
 
-    .cubicle-led.state-writing {
+    .zone-led.state-writing {
       background: #d050ff;
       border-color: #e088ff;
       box-shadow:
@@ -245,7 +249,7 @@
       animation: led-pulse-fast 1s ease-in-out infinite;
     }
 
-    .cubicle-led.state-posting {
+    .zone-led.state-posting {
       background: #00e5ff;
       border-color: #80f5ff;
       box-shadow:
@@ -254,7 +258,7 @@
       animation: led-flash 0.5s steps(2, end) infinite;
     }
 
-    .cubicle-led.state-critic {
+    .zone-led.state-critic {
       background: #fff200;
       border-color: #fff880;
       box-shadow:
@@ -378,10 +382,12 @@ ZONE: OPERATIONS
 STATE: idle</div>
       <div id="game-container"></div>
 
-      <!-- LED status indicators above each cubicle (F.2c-anim redo) -->
-      <div class="cubicle-led" id="cubicle-led-1"></div>
-      <div class="cubicle-led" id="cubicle-led-2"></div>
-      <div class="cubicle-led" id="cubicle-led-3"></div>
+      <!-- Zone LEDs — one per zone the character walks to (F.2c-zone-leds) -->
+      <div class="zone-led" id="zone-led-operations"></div>
+      <div class="zone-led" id="zone-led-communications"></div>
+      <div class="zone-led" id="zone-led-writingDesk"></div>
+      <div class="zone-led" id="zone-led-lounge"></div>
+      <div class="zone-led" id="zone-led-research"></div>
     </div>
   </div>
 
@@ -485,7 +491,9 @@ STATE: idle</div>
       overlay.textContent = `AGENT: deal_hunter\nZONE: ${zone.label}\n${stateLine}\nACTION: ${action}`;
       overlay.style.color = isOffline ? '#ff3b30' : '#f4f0e0';
 
-      setMonitorState(isOffline ? 'idle' : state);
+      // Light the LED for the zone this state maps to (fall back to current zone).
+      const ledZone = STATE_TO_ZONE[state] || scene.currentZone;
+      setMonitorState(isOffline ? 'idle' : state, ledZone);
 
       if (isOffline) return;
 
@@ -500,32 +508,41 @@ STATE: idle</div>
       }
     }
 
-    // Update monitor glow overlays based on agent state. Called from both
-    // applyAgentState (WebSocket) and updateStatusText (keyboard zone changes).
-    function setMonitorState(state) {
-      const leds = document.querySelectorAll('.cubicle-led');
+    // Update zone LEDs — only the currently-active zone gets its state class.
+    // Called from both applyAgentState (WebSocket) and updateStatusText (keyboard).
+    function setMonitorState(state, currentZone) {
+      const leds = document.querySelectorAll('.zone-led');
       leds.forEach(led => {
         const classesToRemove = [];
         led.classList.forEach(cls => {
           if (cls.startsWith('state-')) classesToRemove.push(cls);
         });
         classesToRemove.forEach(cls => led.classList.remove(cls));
-
-        if (state && state !== 'idle' && state !== 'lounge') {
-          led.classList.add('state-' + state);
-        }
       });
+
+      // Light only the LED for the current zone.
+      if (currentZone) {
+        const activeLED = document.getElementById('zone-led-' + currentZone);
+        if (activeLED && state && state !== 'idle') {
+          activeLED.classList.add('state-' + state);
+        }
+      }
     }
 
     // Maps a zone key to the agent state it implies (for keyboard-driven changes).
+    // Keys must match the actual ZONE_MAP zones (communications/writingDesk),
+    // mapped to states consistent with STATE_TO_ZONE so each zone LED lights.
     function zoneToState(zoneKey) {
       const map = {
         'operations': 'scanning',
-        'qualifying': 'qualifying',
+        'communications': 'posting',
+        'writingDesk': 'writing',
         'research': 'researching',
+        'lounge': 'idle',
+        // legacy aliases (not ZONE_MAP keys, kept harmlessly)
+        'qualifying': 'qualifying',
         'writing': 'writing',
         'posting': 'posting',
-        'lounge': 'idle',
       };
       return map[zoneKey] || 'idle';
     }
@@ -543,7 +560,7 @@ STATE: idle</div>
       const state = scene.isWalking ? 'walking' : 'idle';
       const overlay = document.getElementById('status-overlay');
       overlay.textContent = `AGENT: deal_hunter\nZONE: ${zone.label}\nSTATE: ${state}`;
-      setMonitorState(zoneToState(scene.currentZone));
+      setMonitorState(zoneToState(scene.currentZone), scene.currentZone);
     }
 
     function walkToZone(scene, zoneKey) {
