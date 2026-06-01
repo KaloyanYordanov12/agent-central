@@ -42,13 +42,17 @@
     }
 
     /* World wrapper fills the viewport — backdrop image provides sky, lawn,
-       fountain, city skyline, and a contextual corporate building on the right. */
+       fountain, city skyline, and a contextual corporate building on the right.
+       Flex positions the rixitic building in the center-left area. */
     .world-wrapper {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
       background-image: url('/static/assets/world/backdrop.png');
       background-size: cover;
       background-position: center;
@@ -56,14 +60,12 @@
       background-color: #7ec0e8; /* fallback while image loads */
     }
 
-    /* Rixitic building positioned over the left-center area (fountain/lawn).
+    /* Rixitic building positioned over the fountain/lawn (center-left).
        The image's own corporate building (right side) becomes contextual scenery. */
     .building {
-      position: absolute;
-      left: 32%;
-      top: 50%;
-      transform: translate(-50%, -50%);
+      position: relative;
       display: inline-block;
+      margin-left: 18vw;
       border: 12px solid #6e6e6e;
       border-top: 22px solid #4a4a4a;
       background:
