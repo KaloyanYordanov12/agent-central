@@ -205,49 +205,63 @@
     #monitor-2 { left: 646px; top: 378px; }
     #monitor-3 { left: 741px; top: 378px; }
 
-    /* State styles — applied via JS adding classes to all .monitor-glow elements */
+    /* Refined monitor glow — screen-like effect instead of solid sticker.
+       Lower opacity fill, gradient suggesting a lit display,
+       stronger outer glow for visibility. */
     .monitor-glow.state-scanning,
     .monitor-glow.state-operations {
-      opacity: 1;
-      background: #5cb6ff;
-      box-shadow: 0 0 8px 2px rgba(92, 182, 255, 0.7);
+      opacity: 0.7;
+      background: radial-gradient(ellipse at center, #7cc8ff 0%, #3a8acc 90%);
+      box-shadow:
+        0 0 4px 1px rgba(92, 182, 255, 0.6),
+        0 0 12px 3px rgba(92, 182, 255, 0.4);
       animation: monitor-pulse-slow 3s ease-in-out infinite;
     }
 
     .monitor-glow.state-qualifying {
-      opacity: 1;
-      background: #ffb000;
-      box-shadow: 0 0 8px 2px rgba(255, 176, 0, 0.7);
+      opacity: 0.75;
+      background: radial-gradient(ellipse at center, #ffd060 0%, #cc8800 90%);
+      box-shadow:
+        0 0 4px 1px rgba(255, 176, 0, 0.6),
+        0 0 12px 3px rgba(255, 176, 0, 0.4);
       animation: monitor-pulse-medium 2s ease-in-out infinite;
     }
 
     .monitor-glow.state-researching,
     .monitor-glow.state-research,
     .monitor-glow.state-author_research {
-      opacity: 1;
-      background: #4caf50;
-      box-shadow: 0 0 8px 2px rgba(76, 175, 80, 0.7);
+      opacity: 0.7;
+      background: radial-gradient(ellipse at center, #80e090 0%, #2e8a3e 90%);
+      box-shadow:
+        0 0 4px 1px rgba(76, 175, 80, 0.6),
+        0 0 12px 3px rgba(76, 175, 80, 0.4);
       /* steady, no pulse */
     }
 
     .monitor-glow.state-writing {
-      opacity: 1;
-      background: #d050ff;
-      box-shadow: 0 0 8px 2px rgba(208, 80, 255, 0.7);
+      opacity: 0.75;
+      background: radial-gradient(ellipse at center, #e088ff 0%, #9a30bb 90%);
+      box-shadow:
+        0 0 4px 1px rgba(208, 80, 255, 0.6),
+        0 0 12px 3px rgba(208, 80, 255, 0.4);
       animation: monitor-pulse-fast 1.2s ease-in-out infinite;
     }
 
     .monitor-glow.state-posting {
-      opacity: 1;
-      background: #00e5ff;
-      box-shadow: 0 0 8px 2px rgba(0, 229, 255, 0.7);
+      opacity: 0.8;
+      background: radial-gradient(ellipse at center, #80f5ff 0%, #00b8cc 90%);
+      box-shadow:
+        0 0 4px 1px rgba(0, 229, 255, 0.7),
+        0 0 12px 3px rgba(0, 229, 255, 0.4);
       animation: monitor-flash 0.6s steps(2, end) infinite;
     }
 
     .monitor-glow.state-critic {
-      opacity: 1;
-      background: #fff200;
-      box-shadow: 0 0 8px 2px rgba(255, 242, 0, 0.7);
+      opacity: 0.75;
+      background: radial-gradient(ellipse at center, #fff880 0%, #ccbb00 90%);
+      box-shadow:
+        0 0 4px 1px rgba(255, 242, 0, 0.6),
+        0 0 12px 3px rgba(255, 242, 0, 0.4);
       animation: monitor-pulse-medium 2s ease-in-out infinite;
     }
 
@@ -411,7 +425,55 @@ STATE: idle</div>
     let pendingDestination = null; // queued state changes during walks
     let isOffline = false;
 
+    // ============================================================
+    // DEMO MODE — when enabled, keyboard inputs override WebSocket state.
+    // Toggle via ?demo=true URL param or pressing 'D' key.
+    // ============================================================
+    let demoMode = new URLSearchParams(window.location.search).get('demo') === 'true';
+
+    function updateDemoIndicator() {
+      let indicator = document.getElementById('demo-indicator');
+      if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'demo-indicator';
+        indicator.style.cssText = `
+          position: fixed;
+          bottom: 12px;
+          right: 12px;
+          padding: 6px 10px;
+          background: #2d4a5c;
+          color: #f4f0e0;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 10px;
+          letter-spacing: 1px;
+          border: 1px solid #1a3445;
+          border-radius: 2px;
+          z-index: 999;
+          pointer-events: none;
+        `;
+        document.body.appendChild(indicator);
+      }
+      indicator.textContent = demoMode ? 'DEMO MODE' : '';
+      indicator.style.display = demoMode ? 'block' : 'none';
+    }
+
+    // Wire 'D' key to toggle demo mode
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'd' || e.key === 'D') {
+        demoMode = !demoMode;
+        updateDemoIndicator();
+        console.log('Demo mode:', demoMode);
+      }
+    });
+
+    // Initial state
+    updateDemoIndicator();
+
     function applyAgentState(scene, payload) {
+      // In demo mode, ignore WebSocket state updates entirely.
+      // Keyboard inputs are the source of truth.
+      if (demoMode) return;
+
       const state = payload.state;
       const action = payload.current_action || '';
       isOffline = (state === 'offline');
