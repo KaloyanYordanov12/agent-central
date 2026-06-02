@@ -11,9 +11,9 @@
 
 ## What this is
 
-Agent Central is a visual command center for the AI agents I'm building as part of a service business with my partner Misho. Instead of staring at log files or dashboards full of metrics, you see a pixel-art office where each agent is a character that walks between workstations based on what they're actually doing.
+Agent Central is a visual command center for the AI agents I'm building. Instead of staring at log files or dashboards full of metrics, you see a pixel-art office where each agent is a character that walks between workstations based on what they're actually doing.
 
-When Deal Hunter (our Reddit lead-scout agent) is scanning subreddits, his character walks to the Operations zone. When he's writing a DM, he walks to the Writing Desk. When he's idle between cycles, he hangs out in the Lounge. The whole thing is driven by real backend state — not a simulation.
+When Deal Hunter (a Reddit lead-scout agent) is scanning subreddits, his character walks to the Operations zone. When he's writing a DM, he walks to the Writing Desk. When he's idle between cycles, he hangs out in the Lounge. The whole thing is driven by real backend state — not a simulation.
 
 It's a serious distributed system with a deliberately playful interface.
 
@@ -21,7 +21,7 @@ It's a serious distributed system with a deliberately playful interface.
 
 ## Why I built it
 
-Running an AI agent for client work means staring at terminal logs for hours. That's fine for debugging but terrible for situational awareness — you can't tell at a glance whether the agent is healthy, what it's working on, or whether multiple agents are stepping on each other.
+Running an AI agent for real work means staring at terminal logs for hours. That's fine for debugging but terrible for situational awareness — you can't tell at a glance whether the agent is healthy, what it's working on, or whether multiple agents are stepping on each other.
 
 I wanted to fix that. And honestly, I wanted to make it fun to look at.
 
@@ -134,11 +134,6 @@ Some design decisions worth flagging because they shaped the whole thing:
 
 ## Acknowledgements
 
-- **Misho** — building this business with me, manages LinkedIn outreach while I handle technical systems. The "Agent Central is corporate office" framing is partly because we've talked about agents as employees so much it became natural.
-- **[rixitic](https://rixitic.itch.io/)** — gorgeous pixel office tileset. $1 well spent.
-- **[2dPig](https://2dpig.itch.io/)** — clean character sprites.
-- **Claude (Anthropic)** — paired with me on architecture decisions and implementation throughout. The honest moments where we hit dead ends and had to revert (CSS building exterior, floor pulse animations) were as valuable as the wins.
-
----
-
-**Built by [Kolio Yordanov](https://github.com/KaloyanYordanov12)** — third-year software engineering student (Fontys Venlo, NL), building agent systems and a small agent service business with [Misho]. Available for full-time engineering roles starting [date]. Reach me at [email] or DM on [LinkedIn].
+- **[rixitic](https://rixitic.itch.io/)** — gorgeous pixel office tileset
+- **[2dPig](https://2dpig.itch.io/)** — clean character sprites
+- **Claude (Anthropic)** — paired on architecture decisions and implementation throughout. The honest moments where we hit dead ends and had to revert (CSS building exterior, floor pulse animations) were as valuable as the wins
