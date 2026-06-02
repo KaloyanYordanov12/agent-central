@@ -2,7 +2,7 @@
 
 > A real-time observatory for AI agents at work. Watch your agents like you'd watch your colleagues across the office floor — see what they're doing, when, and where.
 
-https://github.com/user-attachments/assets/f22bb881-5ced-4ff6-b30d-c2dbc3573df2
+https://github.com/user-attachments/assets/d029066d-9fd6-4c90-8a44-6409291fa107
 
 **Live demo:** [demo link goes here]
 **Built:** May–June 2026, ~48 hours from skeleton to shipped
