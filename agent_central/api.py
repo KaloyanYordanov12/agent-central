@@ -2,12 +2,13 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import Set
+from typing import Optional, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
+from agent_central import activity_log
 from agent_central.poller import StatusPoller
 from agent_central.registry import registry
 
@@ -39,6 +40,8 @@ _poller: StatusPoller | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _poller
+    # Ensure the activity-log DB + schema exist before the poller starts logging.
+    activity_log.init_db(activity_log.DEFAULT_DB_PATH)
     _poller = StatusPoller(broadcast_fn=broadcast)
     await _poller.start()
     try:
@@ -96,6 +99,32 @@ def agent_trigger(agent_id: str):
     if not agent:
         return {"error": "agent not found", "agent_id": agent_id}, 404
     return agent.trigger()
+
+
+@app.get("/api/secretary/history")
+def secretary_history(
+    agent_id: Optional[str] = None,
+    event_type: Optional[str] = None,
+    since: Optional[str] = None,
+    until: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+):
+    """Query persisted agent activity. Foundation for the Secretary agent.
+
+    `total` is the count for the agent_id filter (per get_event_count's contract);
+    `events` is the matching page, newest first. limit is capped at 1000.
+    """
+    events = activity_log.query_events(
+        agent_id=agent_id,
+        event_type=event_type,
+        since=since,
+        until=until,
+        limit=limit,
+        offset=offset,
+    )
+    total = activity_log.get_event_count(agent_id)
+    return {"total": total, "events": events}
 
 
 # Serve the command center UI

@@ -12,6 +12,8 @@ from typing import Optional
 
 import httpx
 
+from agent_central import activity_log
+
 logger = logging.getLogger(__name__)
 
 DEAL_HUNTER_URL = "http://127.0.0.1:8000/status"
@@ -28,6 +30,14 @@ class StatusPoller:
         self.failure_count = 0
         self.offline = False
         self._task: Optional[asyncio.Task] = None
+
+    @staticmethod
+    def _log_safe(agent_id, event_type, **kwargs):
+        """Log an activity event without ever letting a logging failure break polling."""
+        try:
+            activity_log.log_event(agent_id, event_type, **kwargs)
+        except Exception:
+            logger.exception(f"activity log ({event_type}) failed")
 
     async def start(self):
         self._task = asyncio.create_task(self._loop())
@@ -49,15 +59,33 @@ class StatusPoller:
                     response = await client.get(DEAL_HUNTER_URL)
                     response.raise_for_status()
                     status = response.json()
+                    agent_id = status.get("agent_id", "deal_hunter")
 
                     if self.offline:
                         logger.info("Deal Hunter back online")
+                        self._log_safe(
+                            agent_id, "lifecycle", state="online",
+                            metadata={"transition": "back_online"},
+                        )
                         self.offline = False
                     self.failure_count = 0
 
                     current_state = status.get("state")
                     if current_state != self.last_state:
                         logger.info(f"State change: {self.last_state} -> {current_state}")
+                        # Activity-log site for state changes (and first appearance).
+                        try:
+                            if self.last_state is None:
+                                activity_log.log_event(
+                                    agent_id, "lifecycle", state=current_state,
+                                    metadata={"event": "first_seen"},
+                                )
+                            activity_log.record_state_change(
+                                agent_id, current_state, prev_state=self.last_state,
+                                payload={"current_action": status.get("current_action")},
+                            )
+                        except Exception:
+                            logger.exception("activity log (state_change) failed")
                         self.last_state = current_state
 
                     await self.broadcast({
@@ -72,6 +100,10 @@ class StatusPoller:
                             f"Deal Hunter unreachable after {self.failure_count} attempts: {e}"
                         )
                         self.offline = True
+                        self._log_safe(
+                            "deal_hunter", "lifecycle", state="offline",
+                            metadata={"reason": "unreachable", "failures": self.failure_count},
+                        )
                         await self.broadcast({
                             "type": "status",
                             "payload": {
