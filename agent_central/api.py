@@ -5,9 +5,10 @@ import os
 from contextlib import asynccontextmanager
 from typing import Optional, Set
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from agent_central import activity_log
 from agent_central.poller import StatusPoller
@@ -198,6 +199,62 @@ def secretary_history(
     )
     total = activity_log.get_event_count(agent_id)
     return {"total": total, "events": events}
+
+
+# --- Ask Secretary (Step 3): RAG over the activity vector index ---
+_secretary_client = None
+_secretary_embedding_service = None
+_secretary_vector_index = None
+
+
+def _get_secretary_deps():
+    """Lazily build the Secretary's dependencies.
+
+    Construct the SecretaryClient FIRST so a missing ANTHROPIC_API_KEY fails
+    fast (RuntimeError -> 503) before we pay to load the ~80MB embedding model.
+    """
+    global _secretary_client, _secretary_embedding_service, _secretary_vector_index
+    from agent_central import secretary, indexer
+
+    if _secretary_client is None:
+        _secretary_client = secretary.SecretaryClient()  # raises if no API key
+    if _secretary_embedding_service is None:
+        _secretary_embedding_service = indexer.EmbeddingService()
+    if _secretary_vector_index is None:
+        _secretary_vector_index = indexer.VectorIndex(CHROMA_DIR)
+    return _secretary_client, _secretary_embedding_service, _secretary_vector_index
+
+
+class AskRequest(BaseModel):
+    question: str
+    top_k: Optional[int] = None
+
+
+@app.post("/api/secretary/ask")
+async def secretary_ask(payload: AskRequest):
+    """Answer a natural-language question about agent activity (RAG)."""
+    if not payload.question.strip():
+        raise HTTPException(status_code=400, detail="question cannot be empty")
+
+    try:
+        client, embedding_service, vector_index = _get_secretary_deps()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    top_k = min(payload.top_k or 5, 20)
+
+    from agent_central import secretary
+    try:
+        result = await asyncio.to_thread(
+            secretary.ask_secretary,
+            payload.question, vector_index, embedding_service, client,
+            top_k=top_k,
+        )
+    except Exception:
+        logger.exception("Secretary ask failed")
+        raise HTTPException(status_code=500, detail="Internal error processing question")
+
+    return result
 
 
 # Serve the command center UI
