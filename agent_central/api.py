@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -34,19 +35,91 @@ async def broadcast(message: dict) -> None:
     _ws_clients.difference_update(dead)
 
 
+# --- Secretary background indexer config (Step 2) ---
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+CHROMA_DIR = os.path.join(_PROJECT_ROOT, "data", "chroma")
+INDEX_STATE_PATH = os.path.join(_PROJECT_ROOT, "data", "index_state.json")
+INDEX_INTERVAL_SECONDS = 300
+CHUNK_WINDOW_MINUTES = 15
+
+
+class IndexerTask:
+    """Background task that periodically indexes activity_log events into the
+    vector store. Mirrors StatusPoller's lifecycle; kept separate from it.
+
+    The indexing pass (sync ChromaDB + sentence-transformers work) runs in a
+    worker thread via asyncio.to_thread so it never blocks the event loop. The
+    embedding model + heavy modules load lazily on the first pass.
+    """
+
+    def __init__(self, activity_db_path: str, vector_dir: str, state_path: str,
+                 interval_seconds: int = INDEX_INTERVAL_SECONDS,
+                 window_minutes: int = CHUNK_WINDOW_MINUTES):
+        self.activity_db_path = activity_db_path
+        self.vector_dir = vector_dir
+        self.state_path = state_path
+        self.interval_seconds = interval_seconds
+        self.window_minutes = window_minutes
+        self._task: Optional[asyncio.Task] = None
+        self._embedding_service = None  # lazy
+
+    async def start(self):
+        self._task = asyncio.create_task(self._loop())
+        logger.info("IndexerTask started")
+
+    async def stop(self):
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            logger.info("IndexerTask stopped")
+
+    async def _loop(self):
+        while True:
+            try:
+                await asyncio.to_thread(self._run_pass)
+            except Exception:
+                logger.exception("Indexer pass failed; will retry next cycle")
+            await asyncio.sleep(self.interval_seconds)
+
+    def _run_pass(self):
+        # Synchronous body — runs in a thread via asyncio.to_thread.
+        from agent_central import indexer
+
+        if self._embedding_service is None:
+            self._embedding_service = indexer.EmbeddingService()
+        state = indexer.IndexState.load(self.state_path)
+        stats = indexer.run_index_pass(
+            self.activity_db_path, self.vector_dir, self._embedding_service, state,
+            window_minutes=self.window_minutes,
+        )
+        if stats["new_chunks"]:
+            logger.info(f"Indexer pass complete: {stats}")
+
+
 _poller: StatusPoller | None = None
+_indexer: "IndexerTask | None" = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _poller
+    global _poller, _indexer
     # Ensure the activity-log DB + schema exist before the poller starts logging.
     activity_log.init_db(activity_log.DEFAULT_DB_PATH)
     _poller = StatusPoller(broadcast_fn=broadcast)
     await _poller.start()
+    _indexer = IndexerTask(
+        activity_db_path=activity_log.DEFAULT_DB_PATH,
+        vector_dir=CHROMA_DIR,
+        state_path=INDEX_STATE_PATH,
+    )
+    await _indexer.start()
     try:
         yield
     finally:
+        await _indexer.stop()
         await _poller.stop()
 
 

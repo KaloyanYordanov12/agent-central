@@ -186,3 +186,34 @@ def get_event_count(agent_id: Optional[str] = None) -> int:
         return int(conn.execute(sql, params).fetchone()[0])
     finally:
         conn.close()
+
+
+def get_events_since_id(last_id: int, limit: int = MAX_LIMIT) -> list[dict]:
+    """Return events with id > last_id, ASCENDING by id (chronological insert order).
+
+    Used by the background indexer for append-only consumption: pass the last
+    indexed row id, get the next batch in order. `limit` is capped at 1000.
+    """
+    limit = max(0, min(limit, MAX_LIMIT))
+    sql = (
+        "SELECT id, timestamp, agent_id, event_type, state, payload, metadata "
+        "FROM activity_log WHERE id > ? ORDER BY id ASC LIMIT ?"
+    )
+    conn = _connect()
+    try:
+        rows = conn.execute(sql, (last_id, limit)).fetchall()
+    finally:
+        conn.close()
+
+    events = []
+    for r in rows:
+        events.append({
+            "id": r["id"],
+            "timestamp": r["timestamp"],
+            "agent_id": r["agent_id"],
+            "event_type": r["event_type"],
+            "state": r["state"],
+            "payload": json.loads(r["payload"]) if r["payload"] else None,
+            "metadata": json.loads(r["metadata"]) if r["metadata"] else None,
+        })
+    return events

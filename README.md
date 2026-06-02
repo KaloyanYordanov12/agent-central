@@ -118,6 +118,8 @@ Frontend tests (Phaser scene, browser automation) are intentionally out of scope
 
 **What's next:** Multi-agent support (the Agent base class + registry is already there; just need to add the second agent), expanding zone interactions, and a more sophisticated background.
 
+**Secretary agent (in progress):** Agent activity (state changes, lifecycle events) is persisted to a local SQLite log, and a background indexer runs every 5 minutes to chunk that history into 15-minute windows, embed it with a local sentence-transformers model, and store it in a ChromaDB vector index — the foundation for an upcoming "Secretary" agent that will answer natural-language questions about what agents have been doing. The first indexing pass after startup downloads the embedding model (~80MB) to your local sentence-transformers cache.
+
 ---
 
 ## Why this looks the way it does
