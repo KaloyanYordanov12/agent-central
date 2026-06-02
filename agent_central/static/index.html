@@ -975,6 +975,15 @@ TONER:         operational
         const startZone = ZONE_MAP.operations;
         this.dealHunter = this.add.image(startZone.x, startZone.y, '2dpig-characters', 'deal-hunter');
         this.dealHunter.setOrigin(0.5, 1);
+        // Label above Deal Hunter (matches the Secretary label style). Deal Hunter
+        // moves between zones via tweens, so update() keeps the label glued to it.
+        this.dealHunterLabel = this.add.text(this.dealHunter.x, this.dealHunter.y - 26, 'DEAL HUNTER', {
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: '7px',
+          color: '#f4f0e0',
+          backgroundColor: '#243845',
+          padding: { x: 3, y: 1 },
+        }).setOrigin(0.5, 1);
         this.currentZone = 'operations';
         this.isWalking = false;
 
@@ -1108,6 +1117,15 @@ TONER:         operational
           ws.onerror = (e) => console.error('[WS] error:', e);
         }
         connectWS();
+      },
+
+      update() {
+        // Keep the Deal Hunter label glued above the sprite through walk tweens
+        // and elevator teleports — no change to walkToZone needed.
+        if (this.dealHunter && this.dealHunterLabel) {
+          this.dealHunterLabel.x = this.dealHunter.x;
+          this.dealHunterLabel.y = this.dealHunter.y - 26;
+        }
       },
     };
 
