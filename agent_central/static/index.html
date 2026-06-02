@@ -202,18 +202,15 @@
       transition: background 0.3s ease, box-shadow 0.3s ease;
     }
 
-    /* X anchored to each element's MEASURED visual center (from the source image),
-       not the hitbox center — removes the slight rightward bias. Y normalized to
-       one height per floor. Upper centers (native): REPORTS 320, TEAMWORK 408,
-       Window 544. left = center*1.5 - 4 (half the 8px dot). */
-    /* Upper-floor LEDs all at top: 85px (just above the whiteboards) */
-    #zone-led-operations    { left: 476px; top: 85px; }   /* above REPORTS whiteboard */
-    #zone-led-communications { left: 608px; top: 85px; }  /* above TEAMWORK whiteboard */
-    #zone-led-writingDesk   { left: 812px; top: 85px; }   /* above Window */
-
-    /* Lower-floor LEDs all at top: 360px for consistent visual height */
-    #zone-led-lounge        { left: 904px; top: 360px; }  /* above Water cooler */
-    #zone-led-research      { left: 559px; top: 360px; }  /* above leftmost cubicle */
+    /* Positions anchored to the character's standing point in each zone (ZONE_MAP),
+       not a clickable element — the character stands at ZONE_MAP (x,y), which does
+       not align with the clickable hitboxes. left = zone.x*1.5 - 4 (centered on
+       character), top = zone.y*1.5 - 50 (above his head). */
+    #zone-led-operations    { left: 131px; top: 145px; }  /* character at (90, 130) upper */
+    #zone-led-communications { left: 341px; top: 145px; } /* character at (230, 130) upper */
+    #zone-led-writingDesk   { left: 626px; top: 145px; }  /* character at (420, 130) upper */
+    #zone-led-lounge        { left: 191px; top: 385px; }  /* character at (130, 290) lower */
+    #zone-led-research      { left: 761px; top: 385px; }  /* character at (510, 290) lower */
 
     /* Active states */
     .zone-led.state-scanning,
