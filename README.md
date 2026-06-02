@@ -68,7 +68,7 @@ Two-service distributed system:
 - **Backend:** FastAPI, uvicorn, websockets, httpx
 - **Frontend:** Phaser 3.90, vanilla HTML/CSS/JS
 - **Art:** Custom pixel art from [rixitic](https://rixitic.itch.io/) (interior tileset, $1 strategic asset purchase) + [2dPig](https://2dpig.itch.io/) (character sprites) + AI-generated background
-- **Testing:** pytest, pytest-asyncio (15 backend tests, CI-validated)
+- **Testing:** pytest, pytest-asyncio (50 backend tests covering the API, status polling, WebSocket, activity logging, the background indexer, and the RAG endpoint; CI-validated)
 - **CI:** GitHub Actions, runs tests on every push and PR
 - **Deployment:** uvicorn locally, cloudflared quick-tunnels for remote demos
 
@@ -104,9 +104,36 @@ pip install -r requirements-dev.txt
 pytest tests/ -v
 ```
 
-The test suite covers backend endpoints (`/health`, `/api/agents`, static serving), the WebSocket connection lifecycle, the `broadcast()` helper, the `StatusPoller` initial state, and the agent-state / `STATE_TO_ZONE` contracts. CI runs them on every push and PR via GitHub Actions.
+The test suite covers backend endpoints (`/health`, `/api/agents`, static serving), the WebSocket connection lifecycle, the `broadcast()` helper, the `StatusPoller` initial state, the agent-state / `STATE_TO_ZONE` contracts, the activity log (SQLite IPC + `/api/secretary/history`), the background indexer (chunking, summarization, embeddings, vector store, index-pass idempotency), and the Secretary RAG layer (`/api/secretary/ask`, with the Anthropic client mocked — no real API calls). CI runs them on every push and PR via GitHub Actions.
 
 Frontend tests (Phaser scene, browser automation) are intentionally out of scope for this iteration — Playwright setup overhead isn't worth it for a single-developer project at this stage.
+
+---
+
+## Secretary
+
+The Secretary is an agent inside Agent Central that lets you ask natural-language questions about what your agents have been doing.
+
+Click the blue character labeled "Secretary" at the lower-left of the office, and a floating popup opens with two tabs:
+
+- **History** — a chronological log of agent activity (state changes, lifecycle events, and errors) captured from the agents Agent Central is observing. Filter by agent, by time, or by event type.
+- **Ask Secretary** — type a question like "What has Deal Hunter been doing today?" or "Were there any errors this week?" and the Secretary retrieves the relevant activity, calls Claude Haiku, and returns an answer with source citations.
+
+### How it works
+
+Three pieces stitched together:
+
+1. **Activity logging.** Every state change and lifecycle event observed by the status poller is persisted to a local SQLite database (`data/activity.db`). The log is append-only — no events are overwritten or deleted.
+
+2. **Background indexer.** Every five minutes, a background task reads new events, groups them into 15-minute activity windows per agent, summarizes each window mechanically (no LLM), embeds the summaries with a local sentence-transformers model, and stores them in a persistent ChromaDB vector index at `data/chroma/`. No API costs.
+
+3. **RAG endpoint.** `POST /api/secretary/ask` embeds the question, retrieves the top-K relevant chunks, prompts Claude Haiku with the retrieved context, and returns the answer plus source citations. The call is wrapped in `asyncio.to_thread` so the LLM request never blocks the event loop.
+
+The Ask tab requires `ANTHROPIC_API_KEY` to be set in the environment (a missing key returns a clear 503). The History tab works with no API key at all.
+
+### Demo
+
+The demo video at the top of this README shows the original office before the Secretary was added. Clone the repo, start the server, and the Secretary character appears in the office at the lower-left, ready to click.
 
 ---
 
@@ -117,8 +144,6 @@ Frontend tests (Phaser scene, browser automation) are intentionally out of scope
 **What's pending:** Deal Hunter's Reddit scanner is currently blocked on a 403 from Reddit's CDN — they've tightened their bot detection beyond what a header workaround can solve. Restoring it requires either PRAW pre-approval (Reddit's official policy, multi-week approval process) or rotating residential proxies. The architecture is platform-agnostic — once data flows in, the visualization pipeline reacts in real time.
 
 **What's next:** Multi-agent support (the Agent base class + registry is already there; just need to add the second agent), expanding zone interactions, and a more sophisticated background.
-
-**Secretary agent (in progress):** Agent activity (state changes, lifecycle events) is persisted to a local SQLite log, and a background indexer runs every 5 minutes to chunk that history into 15-minute windows, embed it with a local sentence-transformers model, and store it in a ChromaDB vector index — the foundation for an upcoming "Secretary" agent that will answer natural-language questions about what agents have been doing. The first indexing pass after startup downloads the embedding model (~80MB) to your local sentence-transformers cache.
 
 ---
 
