@@ -49,3 +49,17 @@ def test_static_index_served(client):
     response = client.get("/static/index.html")
     assert response.status_code == 200
     assert "AGENT CENTRAL" in response.text
+
+
+def test_dashboard_includes_secretary_assets(client):
+    """Step 4 regression: the dashboard ships the Secretary popup + its script."""
+    html = client.get("/").text
+    assert 'id="secretary-popup"' in html          # popup markup present
+    assert "/static/secretary.js" in html           # references the new JS file
+
+
+def test_secretary_js_is_served(client):
+    """The Secretary JS module is served from the static mount."""
+    response = client.get("/static/secretary.js")
+    assert response.status_code == 200
+    assert "openSecretaryPopup" in response.text

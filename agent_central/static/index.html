@@ -373,6 +373,77 @@
       background: #8b6534;
       opacity: 0.5;
     }
+
+    /* Secretary popup (Step 4) — floating tabbed console for activity Q&A.
+       Parchment body + navy header, matching the existing palette. */
+    .secretary-popup { position: fixed; inset: 0; z-index: 2000; }
+    .secretary-popup.hidden { display: none; }
+    .secretary-popup-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.3); }
+    .secretary-popup-content {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 660px; max-width: 92vw; height: 560px; max-height: 88vh;
+      display: flex; flex-direction: column;
+      background: #f4e3b8; border: 3px solid #5a3e1f; border-radius: 4px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      font-family: 'JetBrains Mono', monospace; color: #3a2817; overflow: hidden;
+    }
+    .secretary-popup-header {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #243845; color: #f4f0e0; padding: 10px 14px;
+    }
+    .secretary-popup-header h2 { font-size: 15px; font-weight: 700; letter-spacing: 1px; margin: 0; }
+    .secretary-popup-close {
+      background: #d9c489; border: 2px solid #1a2935; color: #1a2935;
+      width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+      font-size: 15px; font-weight: 700; line-height: 1; font-family: inherit;
+    }
+    .secretary-popup-close:hover { background: #a02828; color: #f4e3b8; }
+    .secretary-popup-tabs { display: flex; background: #ecd9a0; border-bottom: 2px solid #5a3e1f; }
+    .secretary-popup-tabs .tab-button {
+      padding: 8px 16px; background: transparent; border: none;
+      border-right: 1px solid #c9b079; cursor: pointer; font-family: inherit;
+      font-size: 12px; color: #5a3e1f; font-weight: 500;
+    }
+    .secretary-popup-tabs .tab-button.active {
+      background: #f4e3b8; font-weight: 700; box-shadow: inset 0 -3px 0 #8b6534;
+    }
+    .secretary-popup-body { flex: 1; min-height: 0; padding: 12px 14px; display: flex; }
+    .secretary-popup-body .tab-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .secretary-popup-body .tab-panel.hidden { display: none; }
+    .history-filters { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .history-filters select {
+      font-family: inherit; font-size: 11px; padding: 4px 6px;
+      background: #fff8e6; border: 1px solid #8b6534; color: #3a2817; border-radius: 2px;
+    }
+    .history-list { flex: 1; overflow-y: auto; font-size: 11px; line-height: 1.5; }
+    .history-item { padding: 6px 4px; border-bottom: 1px solid rgba(139, 101, 52, 0.25); }
+    .history-item .hi-ts { color: #8b6534; }
+    .history-item .hi-agent { color: #243845; font-weight: 700; margin-left: 6px; }
+    .history-item .hi-type { color: #5a3e1f; margin-left: 6px; }
+    .history-item .sec-state { color: #a05a1f; }
+    .history-item .hi-detail { color: #6b563a; margin-top: 2px; }
+    .ask-history { flex: 1; overflow-y: auto; font-size: 12px; line-height: 1.5; margin-bottom: 10px; }
+    .ask-qa { margin-bottom: 12px; }
+    .ask-q { font-weight: 700; color: #243845; margin-bottom: 4px; }
+    .ask-q::before { content: "Q: "; }
+    .ask-a { color: #3a2817; white-space: pre-wrap; }
+    .ask-meta { font-size: 10px; color: #8b6534; margin-top: 4px; }
+    .ask-sources { margin-top: 6px; font-size: 11px; }
+    .ask-sources summary { cursor: pointer; color: #5a3e1f; }
+    .ask-sources ul { margin: 4px 0 0 0; padding-left: 18px; }
+    .ask-sources code { background: #ecd9a0; padding: 0 3px; }
+    .ask-input-row { display: flex; gap: 8px; }
+    .ask-input-row input {
+      flex: 1; font-family: inherit; font-size: 12px; padding: 8px;
+      background: #fff8e6; border: 1px solid #8b6534; color: #3a2817; border-radius: 2px;
+    }
+    .ask-input-row button {
+      font-family: inherit; font-size: 12px; font-weight: 700; padding: 8px 16px;
+      background: #243845; color: #f4f0e0; border: none; border-radius: 2px; cursor: pointer;
+    }
+    .ask-input-row button:disabled { opacity: 0.5; cursor: default; }
+    .sec-muted { color: #8b6534; font-style: italic; }
+    .sec-error { color: #a02828; }
   </style>
 </head>
 <body>
@@ -398,6 +469,52 @@ STATE: idle</div>
     <button class="popup-close" id="popup-close">×</button>
     <div class="popup-content" id="popup-content"></div>
   </div>
+
+  <!-- Secretary popup (Step 4): History + Ask tabs over /api/secretary/* -->
+  <div id="secretary-popup" class="secretary-popup hidden">
+    <div class="secretary-popup-backdrop"></div>
+    <div class="secretary-popup-content">
+      <div class="secretary-popup-header">
+        <h2>SECRETARY</h2>
+        <button class="secretary-popup-close" aria-label="Close">×</button>
+      </div>
+      <div class="secretary-popup-tabs">
+        <button class="tab-button active" data-tab="history">History</button>
+        <button class="tab-button" data-tab="ask">Ask Secretary</button>
+      </div>
+      <div class="secretary-popup-body">
+        <div class="tab-panel" data-panel="history">
+          <div class="history-filters">
+            <select id="history-agent-filter">
+              <option value="">All agents</option>
+            </select>
+            <select id="history-time-filter">
+              <option value="">All time</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="week">This week</option>
+            </select>
+            <select id="history-type-filter">
+              <option value="">All events</option>
+              <option value="state_change">State changes</option>
+              <option value="lifecycle">Lifecycle</option>
+              <option value="error">Errors</option>
+            </select>
+          </div>
+          <div class="history-list" id="history-list"></div>
+        </div>
+        <div class="tab-panel hidden" data-panel="ask">
+          <div class="ask-history" id="ask-history"></div>
+          <div class="ask-input-row">
+            <input type="text" id="ask-input" placeholder="Ask about agent activity..." />
+            <button id="ask-submit">Ask</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/secretary.js"></script>
 
   <script>
     // ============================================================
@@ -925,6 +1042,37 @@ TONER:         operational
         printer.on('pointerdown', (pointer) => {
           showPopup('printer', pointer.event);
         });
+
+        // --- Secretary character (Step 4) ---
+        // Stationary "front desk" agent on the lower floor (left-of-center).
+        // Reuses the Deal Hunter sprite frame, recolored with a muted blue tint,
+        // and never moves — distinguishing it from the walking worker agents.
+        const SECRETARY_TINT = 0x8a7fd0;
+        const secretarySprite = this.add.image(200, 290, '2dpig-characters', 'deal-hunter');
+        secretarySprite.setOrigin(0.5, 1);
+        secretarySprite.setTint(SECRETARY_TINT);
+        this.add.text(200, 264, 'SECRETARY', {
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: '7px',
+          color: '#f4f0e0',
+          backgroundColor: '#243845',
+          padding: { x: 3, y: 1 },
+        }).setOrigin(0.5, 1);
+
+        secretarySprite.setInteractive({ cursor: 'pointer', useHandCursor: true });
+        secretarySprite.on('pointerdown', () => {
+          if (window.openSecretaryPopup) window.openSecretaryPopup();
+        });
+        // Subtle idle pulse so it reads as interactive.
+        this.tweens.add({
+          targets: secretarySprite, alpha: { from: 1, to: 0.7 },
+          duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+        });
+        // Highlight hook called by secretary.js while the popup is open/closed.
+        window.setSecretaryGlow = (on) => {
+          if (on) secretarySprite.clearTint();
+          else secretarySprite.setTint(SECRETARY_TINT);
+        };
 
         // Status overlay is an HTML div (#status-overlay) updated via
         // updateStatusText/applyAgentState — keeps it readable over a transparent canvas.
