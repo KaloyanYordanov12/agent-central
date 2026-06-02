@@ -2,7 +2,7 @@
 
 > A real-time observatory for AI agents at work. Watch your agents like you'd watch your colleagues across the office floor — see what they're doing, when, and where.
 
-![Agent Central screenshot](docs/agent-central-hero.png)
+https://github.com/user-attachments/assets/f22bb881-5ced-4ff6-b30d-c2dbc3573df2
 
 **Live demo:** [demo link goes here]
 **Built:** May–June 2026, ~48 hours from skeleton to shipped
