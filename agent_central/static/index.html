@@ -1083,6 +1083,27 @@ TONER:         operational
           else secretarySprite.setTint(SECRETARY_TINT);
         };
 
+        // --- Job Scout character (new agent, commit 1) ---
+        // Stationary agent that discovers job listings from public sources.
+        // Lower-floor right (between the cubicles/research stand and the water
+        // cooler), opposite the Secretary. Distinct green-yellow tint. No click
+        // handler yet — the popup UI comes in commit 2.
+        const JOB_SCOUT_TINT = 0xb8d070;
+        const jobScoutSprite = this.add.image(560, 290, '2dpig-characters', 'deal-hunter');
+        jobScoutSprite.setOrigin(0.5, 1);
+        jobScoutSprite.setTint(JOB_SCOUT_TINT);
+        this.add.text(560, 264, 'JOB SCOUT', {
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: '7px',
+          color: '#f4f0e0',
+          backgroundColor: '#243845',
+          padding: { x: 3, y: 1 },
+        }).setOrigin(0.5, 1);
+        this.tweens.add({
+          targets: jobScoutSprite, alpha: { from: 1, to: 0.7 },
+          duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+        });
+
         // Status overlay is an HTML div (#status-overlay) updated via
         // updateStatusText/applyAgentState — keeps it readable over a transparent canvas.
         updateStatusText(this);

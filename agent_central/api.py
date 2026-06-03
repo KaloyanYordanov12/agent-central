@@ -43,6 +43,9 @@ INDEX_STATE_PATH = os.path.join(_PROJECT_ROOT, "data", "index_state.json")
 INDEX_INTERVAL_SECONDS = 300
 CHUNK_WINDOW_MINUTES = 15
 
+# --- Job Scout config (new agent, commit 1) ---
+JOB_SCOUT_INTERVAL_SECONDS = 10800  # 3 hours
+
 
 class IndexerTask:
     """Background task that periodically indexes activity_log events into the
@@ -100,14 +103,70 @@ class IndexerTask:
             logger.info(f"Indexer pass complete: {stats}")
 
 
+class JobScoutTask:
+    """Background task that polls public job sources every few hours, filters,
+    and stores survivors in discovered_jobs. Mirrors IndexerTask: the sync HTTP
+    + sqlite work runs in a worker thread via asyncio.to_thread.
+    """
+
+    def __init__(self, activity_db_path: str,
+                 interval_seconds: int = JOB_SCOUT_INTERVAL_SECONDS):
+        self.activity_db_path = activity_db_path
+        self.interval_seconds = interval_seconds
+        self._task: Optional[asyncio.Task] = None
+
+    async def start(self):
+        self._task = asyncio.create_task(self._loop())
+        logger.info("JobScoutTask started")
+
+    async def stop(self):
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            logger.info("JobScoutTask stopped")
+
+    async def _loop(self):
+        from agent_central import activity_log
+        # Announce the agent before the first pass so it appears in the log.
+        activity_log.log_event("job_scout", "lifecycle", state="idle",
+                               metadata={"event": "first_seen"})
+        while True:
+            try:
+                await asyncio.to_thread(self._run_pass)
+            except Exception:
+                logger.exception("Job Scout pass failed; will retry next cycle")
+            await asyncio.sleep(self.interval_seconds)
+
+    def _run_pass(self):
+        # Synchronous body — runs in a thread via asyncio.to_thread.
+        from agent_central import job_scout, activity_log
+
+        activity_log.log_event("job_scout", "state_change", state="scanning",
+                               metadata={"event": "pass_start"})
+        try:
+            stats = job_scout.run_scout_pass(self.activity_db_path)
+            activity_log.log_event("job_scout", "state_change", state="idle",
+                                   payload=stats, metadata={"event": "pass_complete"})
+            if stats.get("new", 0):
+                logger.info(f"Job Scout pass complete: {stats}")
+        except Exception:
+            activity_log.log_event("job_scout", "error", state="error",
+                                   metadata={"event": "pass_failed"})
+            raise
+
+
 _poller: StatusPoller | None = None
 _indexer: "IndexerTask | None" = None
+_job_scout: "JobScoutTask | None" = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _poller, _indexer
-    # Ensure the activity-log DB + schema exist before the poller starts logging.
+    global _poller, _indexer, _job_scout
+    # Ensure the activity-log DB + schema (incl. discovered_jobs) exist first.
     activity_log.init_db(activity_log.DEFAULT_DB_PATH)
     _poller = StatusPoller(broadcast_fn=broadcast)
     await _poller.start()
@@ -117,9 +176,12 @@ async def lifespan(app: FastAPI):
         state_path=INDEX_STATE_PATH,
     )
     await _indexer.start()
+    _job_scout = JobScoutTask(activity_db_path=activity_log.DEFAULT_DB_PATH)
+    await _job_scout.start()
     try:
         yield
     finally:
+        await _job_scout.stop()
         await _indexer.stop()
         await _poller.stop()
 

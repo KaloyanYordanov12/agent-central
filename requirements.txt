@@ -8,3 +8,6 @@ sentence-transformers>=2.7.0
 
 # Secretary agent — Ask endpoint / RAG (Step 3)
 anthropic>=0.40.0
+
+# Job Scout agent — RSS/JSON job-source discovery (commit 1)
+feedparser>=6.0

@@ -39,6 +39,25 @@ CREATE TABLE IF NOT EXISTS activity_log (
 CREATE INDEX IF NOT EXISTS idx_agent_id ON activity_log(agent_id);
 CREATE INDEX IF NOT EXISTS idx_timestamp ON activity_log(timestamp);
 CREATE INDEX IF NOT EXISTS idx_event_type ON activity_log(event_type);
+
+-- Job Scout (commit 1): discovered job listings, deduped by URL. Lives in the
+-- same DB file as activity_log; created here so init_db sets up both tables.
+CREATE TABLE IF NOT EXISTS discovered_jobs (
+    url TEXT PRIMARY KEY,
+    source TEXT NOT NULL,
+    title TEXT NOT NULL,
+    company TEXT,
+    location TEXT,
+    description TEXT,
+    posted_at TEXT,
+    discovered_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'discovered',
+    filter_reason TEXT,
+    payload TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_dj_status ON discovered_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_dj_source ON discovered_jobs(source);
+CREATE INDEX IF NOT EXISTS idx_dj_discovered_at ON discovered_jobs(discovered_at);
 """
 
 
