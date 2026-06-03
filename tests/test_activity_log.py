@@ -127,6 +127,43 @@ def test_no_log_on_unchanged_state(temp_activity_db):
     assert activity_log.get_event_count() == 0
 
 
+# --- get_current_state (state-coupled walking) -------------------------------
+
+def test_get_current_state_none_when_no_events(temp_activity_db):
+    """An agent with no state_change/error events yet returns None (idle)."""
+    assert activity_log.get_current_state("job_scout") is None
+
+
+def test_get_current_state_returns_latest_state_change(temp_activity_db):
+    activity_log.log_event("job_scout", "state_change", state="scanning")
+    activity_log.log_event("job_scout", "state_change", state="idle")
+    current = activity_log.get_current_state("job_scout")
+    assert current["state"] == "idle"          # most recent wins
+    assert "timestamp" in current
+
+
+def test_get_current_state_includes_error_events(temp_activity_db):
+    """error events count as state-bearing — a crashed pass surfaces as 'error'."""
+    activity_log.log_event("job_analyst", "state_change", state="scanning")
+    activity_log.log_event("job_analyst", "error", state="error",
+                           metadata={"event": "pass_failed"})
+    current = activity_log.get_current_state("job_analyst")
+    assert current["state"] == "error"
+    assert current["metadata"] == {"event": "pass_failed"}
+
+
+def test_get_current_state_skips_lifecycle_and_is_per_agent(temp_activity_db):
+    # lifecycle first_seen must NOT be treated as current state...
+    activity_log.log_event("job_scout", "lifecycle", state="idle",
+                           metadata={"event": "first_seen"})
+    assert activity_log.get_current_state("job_scout") is None
+    # ...and state is scoped to the requested agent only.
+    activity_log.log_event("job_scout", "state_change", state="scanning")
+    activity_log.log_event("job_analyst", "state_change", state="idle")
+    assert activity_log.get_current_state("job_scout")["state"] == "scanning"
+    assert activity_log.get_current_state("job_analyst")["state"] == "idle"
+
+
 def test_history_endpoint_returns_events(client, temp_activity_db):
     activity_log.log_event(
         "deal_hunter", "state_change", state="scanning",

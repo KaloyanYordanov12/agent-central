@@ -283,6 +283,33 @@ def get_events_since_id(last_id: int, limit: int = MAX_LIMIT) -> list[dict]:
     return events
 
 
+def get_current_state(agent_id: str) -> Optional[dict]:
+    """Return the most recent state-bearing event for an agent.
+
+    Considers both 'state_change' and 'error' events (most recent of either),
+    so a crashed pass surfaces as state 'error'. 'lifecycle' first_seen events
+    are intentionally excluded. Returns {state, timestamp, metadata} or None
+    when the agent has no such events yet (caller treats None as idle).
+    """
+    sql = (
+        "SELECT state, timestamp, metadata FROM activity_log "
+        "WHERE agent_id = ? AND event_type IN ('state_change', 'error') "
+        "ORDER BY id DESC LIMIT 1"
+    )
+    conn = _connect()
+    try:
+        row = conn.execute(sql, (agent_id,)).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return None
+    return {
+        "state": row["state"],
+        "timestamp": row["timestamp"],
+        "metadata": json.loads(row["metadata"]) if row["metadata"] else None,
+    }
+
+
 def _estimate_cost_usd(model, input_tokens, output_tokens,
                        cache_creation_tokens, cache_read_tokens):
     """Estimate USD cost from token counts + PRICING. None if model unknown.

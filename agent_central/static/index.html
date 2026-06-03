@@ -836,6 +836,81 @@ STATE: idle</div>
     }
 
     // ============================================================
+    // STATE-COUPLED WALKING for stationary agents.
+    // Job Scout / Job Analyst couple to backend state pushed over the
+    // 'agent_states' WebSocket message; Secretary gets a cosmetic wander
+    // (no scheduled state to couple to). Deal Hunter is unaffected.
+    // ============================================================
+
+    // Generic single-axis walker for a stationary sprite. Mirrors Deal Hunter's
+    // queueing: a state change mid-walk parks the next target in `pendingX`,
+    // consumed on arrival, so rapid state flips resolve cleanly without
+    // stacking tweens. Only horizontal movement (these agents never change floor).
+    function makeCoupledWalker(scene, sprite, homeX, awayX, pulseTween) {
+      const w = { isWalking: false, pendingX: null };
+
+      function arrive() {
+        w.isWalking = false;
+        const next = w.pendingX;
+        w.pendingX = null;
+        if (next !== null && Math.abs(next - sprite.x) > 1) walkTo(next);
+      }
+
+      function walkTo(x) {
+        if (Math.abs(sprite.x - x) <= 1) return;
+        if (w.isWalking) { w.pendingX = x; return; }
+        w.isWalking = true;
+        const duration = (Math.abs(x - sprite.x) / WALK_SPEED) * 1000;
+        scene.tweens.add({
+          targets: sprite, x: x, duration: duration, ease: 'Linear',
+          onComplete: arrive,
+        });
+      }
+
+      function setError(on) {
+        // Faster alpha pulse signals an errored pass; reset to calm idle pulse.
+        if (pulseTween) pulseTween.timeScale = on ? 2.5 : 1;
+      }
+
+      return {
+        // idle/error -> walk home; scanning -> walk away; unknown -> stay put.
+        setState(state) {
+          if (state === 'scanning') { setError(false); walkTo(awayX); }
+          else if (state === 'idle')  { setError(false); walkTo(homeX); }
+          else if (state === 'error') { setError(true);  walkTo(homeX); }
+          // any other state: leave the sprite where it is.
+        },
+      };
+    }
+
+    // Subdued cosmetic wander for the Secretary, which has no scheduled state.
+    // Rarely drifts a short distance, idles briefly, walks back — "barely moves
+    // but isn't stationary". Uses fixed-duration tweens (not distance-based).
+    function setupSecretaryCosmeticWander(scene, sprite, opts) {
+      const rand = (lo, hi) => lo + Math.random() * (hi - lo);
+
+      function walk(x, onDone) {
+        scene.tweens.add({
+          targets: sprite, x: x, duration: opts.walkDurationMs,
+          ease: 'Sine.easeInOut', onComplete: onDone,
+        });
+      }
+
+      function scheduleNextWander() {
+        scene.time.delayedCall(rand(opts.idleAtHomeMinMs, opts.idleAtHomeMaxMs), () => {
+          const away = opts.awayPositions[Math.floor(Math.random() * opts.awayPositions.length)];
+          walk(away, () => {
+            scene.time.delayedCall(rand(opts.idleAwayMinMs, opts.idleAwayMaxMs), () => {
+              walk(opts.home, scheduleNextWander);
+            });
+          });
+        });
+      }
+
+      scene.time.delayedCall(opts.initialDelayMs, scheduleNextWander);
+    }
+
+    // ============================================================
     // CLICKABLE OFFICE ELEMENTS (F.2b) — terminal-style popups.
     // Called by Phaser pointerdown handlers in create(); mouseEvent is
     // the native DOM event (clientX/clientY) used for positioning.
@@ -1152,7 +1227,9 @@ TONER:         operational
         const secretarySprite = this.add.image(200, 290, '2dpig-characters', 'deal-hunter');
         secretarySprite.setOrigin(0.5, 1);
         secretarySprite.setTint(SECRETARY_TINT);
-        this.add.text(200, 264, 'SECRETARY', {
+        // Promoted to this.* so update() can follow the label as it wanders.
+        this.secretarySprite = secretarySprite;
+        this.secretaryLabel = this.add.text(200, 264, 'SECRETARY', {
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: '7px',
           color: '#f4f0e0',
@@ -1174,6 +1251,18 @@ TONER:         operational
           if (on) secretarySprite.clearTint();
           else secretarySprite.setTint(SECRETARY_TINT);
         };
+        // Cosmetic wander — Secretary has no scheduled backend state to couple
+        // to, so it just drifts a little to add life (params per spec D).
+        setupSecretaryCosmeticWander(this, secretarySprite, {
+          home: 200,
+          awayPositions: [160, 240],
+          walkDurationMs: 4000,
+          idleAtHomeMinMs: 60000,   // 60-120s between wanders — mostly still
+          idleAtHomeMaxMs: 120000,
+          idleAwayMinMs: 5000,
+          idleAwayMaxMs: 10000,
+          initialDelayMs: Math.random() * 60000,
+        });
 
         // --- Job Scout character (new agent, commit 1) ---
         // Stationary agent that discovers job listings from public sources.
@@ -1184,14 +1273,15 @@ TONER:         operational
         const jobScoutSprite = this.add.image(560, 290, '2dpig-characters', 'deal-hunter');
         jobScoutSprite.setOrigin(0.5, 1);
         jobScoutSprite.setTint(JOB_SCOUT_TINT);
-        this.add.text(560, 264, 'JOB SCOUT', {
+        this.jobScoutSprite = jobScoutSprite;
+        this.jobScoutLabel = this.add.text(560, 264, 'JOB SCOUT', {
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: '7px',
           color: '#f4f0e0',
           backgroundColor: '#243845',
           padding: { x: 3, y: 1 },
         }).setOrigin(0.5, 1);
-        this.tweens.add({
+        const jobScoutPulse = this.tweens.add({
           targets: jobScoutSprite, alpha: { from: 1, to: 0.7 },
           duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
         });
@@ -1204,6 +1294,9 @@ TONER:         operational
           if (on) jobScoutSprite.clearTint();
           else jobScoutSprite.setTint(JOB_SCOUT_TINT);
         };
+        // State-coupled walking: home (560) at station, away (640) toward the
+        // right wall while scanning sources.
+        const jobScoutWalker = makeCoupledWalker(this, jobScoutSprite, 560, 640, jobScoutPulse);
 
         // --- Job Analyst character (new agent, commit 2a) ---
         // Stationary agent that LLM-scores discovered jobs. Upper floor, right of
@@ -1213,14 +1306,15 @@ TONER:         operational
         const jobAnalystSprite = this.add.image(480, 130, '2dpig-characters', 'deal-hunter');
         jobAnalystSprite.setOrigin(0.5, 1);
         jobAnalystSprite.setTint(JOB_ANALYST_TINT);
-        this.add.text(480, 104, 'JOB ANALYST', {
+        this.jobAnalystSprite = jobAnalystSprite;
+        this.jobAnalystLabel = this.add.text(480, 104, 'JOB ANALYST', {
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: '7px',
           color: '#f4f0e0',
           backgroundColor: '#243845',
           padding: { x: 3, y: 1 },
         }).setOrigin(0.5, 1);
-        this.tweens.add({
+        const jobAnalystPulse = this.tweens.add({
           targets: jobAnalystSprite, alpha: { from: 1, to: 0.7 },
           duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
         });
@@ -1233,6 +1327,9 @@ TONER:         operational
           if (on) jobAnalystSprite.clearTint();
           else jobAnalystSprite.setTint(JOB_ANALYST_TINT);
         };
+        // State-coupled walking: home (480) at desk, away (380) walked over to
+        // consult data/references while scanning.
+        const jobAnalystWalker = makeCoupledWalker(this, jobAnalystSprite, 480, 380, jobAnalystPulse);
 
         // Status overlay is an HTML div (#status-overlay) updated via
         // updateStatusText/applyAgentState — keeps it readable over a transparent canvas.
@@ -1256,6 +1353,15 @@ TONER:         operational
               const msg = JSON.parse(event.data);
               if (msg.type === 'status') {
                 applyAgentState(scene, msg.payload);
+              } else if (msg.type === 'agent_states' && msg.agents) {
+                // Couple stationary-agent walking to backend state. Deal Hunter
+                // is driven by the legacy 'status' message above, untouched here.
+                if (msg.agents.job_scout) {
+                  jobScoutWalker.setState(msg.agents.job_scout.state);
+                }
+                if (msg.agents.job_analyst) {
+                  jobAnalystWalker.setState(msg.agents.job_analyst.state);
+                }
               }
             } catch (e) {
               console.error('[WS] failed to parse message:', e);
@@ -1277,6 +1383,13 @@ TONER:         operational
           this.dealHunterLabel.x = this.dealHunter.x;
           this.dealHunterLabel.y = this.dealHunter.y - 26;
         }
+        // Stationary agents now move too — keep each label glued above its sprite.
+        const follow = (sprite, label) => {
+          if (sprite && label) { label.x = sprite.x; label.y = sprite.y - 26; }
+        };
+        follow(this.secretarySprite, this.secretaryLabel);
+        follow(this.jobScoutSprite, this.jobScoutLabel);
+        follow(this.jobAnalystSprite, this.jobAnalystLabel);
       },
     };
 

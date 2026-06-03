@@ -71,6 +71,69 @@ def test_broadcast_no_clients_is_noop():
     asyncio.run(api.broadcast({"type": "status", "payload": {}}))
 
 
+def test_broadcast_agent_states_includes_all_agents(temp_activity_db):
+    """_broadcast_agent_states emits a unified message with Deal Hunter (from
+    the polled /status payload) plus the activity_log-derived stationary agents."""
+    from agent_central import activity_log
+
+    activity_log.log_event("job_scout", "state_change", state="scanning")
+    # job_analyst has no events yet -> should default to idle.
+
+    sent = []
+
+    async def fake_broadcast(msg):
+        sent.append(msg)
+
+    poller = StatusPoller(broadcast_fn=fake_broadcast)
+    dh_status = {"agent_id": "deal_hunter", "state": "running",
+                 "current_action": "qualifying lead"}
+    asyncio.run(poller._broadcast_agent_states(dh_status))
+
+    assert len(sent) == 1
+    msg = sent[0]
+    assert msg["type"] == "agent_states"
+    agents = msg["agents"]
+    assert agents["deal_hunter"]["state"] == "running"
+    assert agents["job_scout"]["state"] == "scanning"
+    assert agents["job_analyst"] == {"state": "idle"}   # no events -> idle
+
+
+def test_broadcast_agent_states_survives_db_error():
+    """A DB failure while deriving stationary state must not break the broadcast;
+    affected agents fall back to idle (polling must never crash)."""
+    from agent_central import activity_log
+
+    old_path = activity_log._DB_PATH
+    activity_log._DB_PATH = "/nonexistent/dir/activity.db"
+    sent = []
+
+    async def fake_broadcast(msg):
+        sent.append(msg)
+
+    try:
+        poller = StatusPoller(broadcast_fn=fake_broadcast)
+        asyncio.run(poller._broadcast_agent_states(
+            {"agent_id": "deal_hunter", "state": "idle", "current_action": None}))
+    finally:
+        activity_log._DB_PATH = old_path
+
+    assert len(sent) == 1
+    agents = sent[0]["agents"]
+    assert agents["job_scout"] == {"state": "idle"}
+    assert agents["job_analyst"] == {"state": "idle"}
+
+
+def test_frontend_handles_agent_states_message():
+    """The frontend WS handler must dispatch 'agent_states' to the per-agent
+    walkers (static-text contract check, not browser automation)."""
+    index = os.path.join(os.path.dirname(api.__file__), "static", "index.html")
+    with open(index, encoding="utf-8") as f:
+        html = f.read()
+    assert "agent_states" in html
+    assert "jobScoutWalker.setState" in html
+    assert "jobAnalystWalker.setState" in html
+
+
 def test_frontend_state_to_zone_covers_pipeline_states():
     """The frontend STATE_TO_ZONE map must route every Deal Hunter pipeline
     state to a zone, or the character won't move on that state. This is a

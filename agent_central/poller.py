@@ -52,6 +52,34 @@ class StatusPoller:
                 pass
             logger.info("StatusPoller stopped")
 
+    # Stationary agents whose live state is derived from activity_log rather
+    # than a dashboard endpoint. Deal Hunter is added separately from /status.
+    DERIVED_AGENTS = ("job_scout", "job_analyst")
+
+    async def _broadcast_agent_states(self, deal_hunter_status: dict):
+        """Emit a unified 'agent_states' message alongside the legacy 'status'.
+
+        Deal Hunter's slice comes from its just-polled /status payload; the
+        stationary agents' slices come from their most recent state_change/error
+        event in activity_log. A DB error here must never break polling, so the
+        derivation is guarded and falls back to idle.
+        """
+        agents = {
+            "deal_hunter": {
+                "state": deal_hunter_status.get("state"),
+                "current_action": deal_hunter_status.get("current_action"),
+            },
+        }
+        for agent_id in self.DERIVED_AGENTS:
+            try:
+                state = activity_log.get_current_state(agent_id)
+            except Exception:
+                logger.exception(f"get_current_state({agent_id}) failed")
+                state = None
+            agents[agent_id] = state or {"state": "idle"}
+
+        await self.broadcast({"type": "agent_states", "agents": agents})
+
     async def _loop(self):
         async with httpx.AsyncClient(timeout=2.0) as client:
             while True:
@@ -93,6 +121,12 @@ class StatusPoller:
                         "payload": status,
                     })
 
+                    # Multi-agent broadcast: legacy Deal Hunter 'status' message
+                    # above is preserved for backward compat; this additive
+                    # message carries every agent's current state so the
+                    # frontend can couple stationary-agent walking to it.
+                    await self._broadcast_agent_states(status)
+
                 except (httpx.RequestError, httpx.HTTPStatusError) as e:
                     self.failure_count += 1
                     if self.failure_count >= OFFLINE_THRESHOLD and not self.offline:
@@ -104,14 +138,19 @@ class StatusPoller:
                             "deal_hunter", "lifecycle", state="offline",
                             metadata={"reason": "unreachable", "failures": self.failure_count},
                         )
+                        offline_status = {
+                            "agent_id": "deal_hunter",
+                            "state": "offline",
+                            "current_action": "Deal Hunter unreachable",
+                            "last_changed_at": time.time(),
+                        }
                         await self.broadcast({
                             "type": "status",
-                            "payload": {
-                                "agent_id": "deal_hunter",
-                                "state": "offline",
-                                "current_action": "Deal Hunter unreachable",
-                                "last_changed_at": time.time(),
-                            },
+                            "payload": offline_status,
                         })
+                        # Stationary agents are independent of Deal Hunter's
+                        # reachability — keep their walking coupled even when
+                        # Deal Hunter is down.
+                        await self._broadcast_agent_states(offline_status)
 
                 await asyncio.sleep(POLL_INTERVAL)
