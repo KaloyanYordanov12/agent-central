@@ -83,6 +83,14 @@ class StatusPoller:
     async def _loop(self):
         async with httpx.AsyncClient(timeout=2.0) as client:
             while True:
+                # Deal Hunter slice for this cycle's agent_states broadcast.
+                # Defaults to last-known state so a transient poll failure
+                # (before the offline threshold) doesn't blank Deal Hunter.
+                dh_status = {
+                    "agent_id": "deal_hunter",
+                    "state": self.last_state or "idle",
+                    "current_action": None,
+                }
                 try:
                     response = await client.get(DEAL_HUNTER_URL)
                     response.raise_for_status()
@@ -120,12 +128,7 @@ class StatusPoller:
                         "type": "status",
                         "payload": status,
                     })
-
-                    # Multi-agent broadcast: legacy Deal Hunter 'status' message
-                    # above is preserved for backward compat; this additive
-                    # message carries every agent's current state so the
-                    # frontend can couple stationary-agent walking to it.
-                    await self._broadcast_agent_states(status)
+                    dh_status = status
 
                 except (httpx.RequestError, httpx.HTTPStatusError) as e:
                     self.failure_count += 1
@@ -138,19 +141,29 @@ class StatusPoller:
                             "deal_hunter", "lifecycle", state="offline",
                             metadata={"reason": "unreachable", "failures": self.failure_count},
                         )
-                        offline_status = {
+                        # Legacy 'status' offline notice is sent once, at the
+                        # transition, to preserve existing Deal Hunter behavior.
+                        await self.broadcast({
+                            "type": "status",
+                            "payload": {
+                                "agent_id": "deal_hunter",
+                                "state": "offline",
+                                "current_action": "Deal Hunter unreachable",
+                                "last_changed_at": time.time(),
+                            },
+                        })
+                    if self.offline:
+                        dh_status = {
                             "agent_id": "deal_hunter",
                             "state": "offline",
                             "current_action": "Deal Hunter unreachable",
-                            "last_changed_at": time.time(),
                         }
-                        await self.broadcast({
-                            "type": "status",
-                            "payload": offline_status,
-                        })
-                        # Stationary agents are independent of Deal Hunter's
-                        # reachability — keep their walking coupled even when
-                        # Deal Hunter is down.
-                        await self._broadcast_agent_states(offline_status)
+
+                # Multi-agent broadcast runs EVERY cycle regardless of Deal
+                # Hunter's reachability — Job Scout / Job Analyst are independent
+                # agents whose walking must keep updating even when Deal Hunter
+                # is down. The legacy 'status' message above is preserved for
+                # backward compat; this additive message carries all agent state.
+                await self._broadcast_agent_states(dh_status)
 
                 await asyncio.sleep(POLL_INTERVAL)

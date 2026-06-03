@@ -1346,7 +1346,11 @@ TONER:         operational
         const scene = this;
         let ws;
         function connectWS() {
-          ws = new WebSocket('ws://127.0.0.1:8001/ws/status');
+          // Same-origin WS: derive host/port/scheme from the page so it works
+          // on whatever port the app is served from (and over wss:// through
+          // the https tunnel) — not a hardcoded :8001.
+          const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+          ws = new WebSocket(`${wsProto}//${location.host}/ws/status`);
           ws.onopen = () => console.log('[WS] connected');
           ws.onmessage = (event) => {
             try {

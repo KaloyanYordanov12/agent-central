@@ -123,6 +123,58 @@ def test_broadcast_agent_states_survives_db_error():
     assert agents["job_analyst"] == {"state": "idle"}
 
 
+def test_agent_states_emitted_every_cycle_while_offline(temp_activity_db, monkeypatch):
+    """Regression: while Deal Hunter is unreachable the poller must keep emitting
+    'agent_states' on EVERY loop cycle (not just once at the offline transition),
+    so stationary-agent walking stays live independent of Deal Hunter."""
+    from agent_central import poller as poller_mod
+
+    class _StopLoop(Exception):
+        """Sentinel raised from the fake client to break the infinite loop."""
+
+    class _FailingClient:
+        """Async-context HTTP client whose .get always fails (so the poller goes
+        and stays offline), then aborts the loop after a few cycles."""
+        def __init__(self, *a, **k):
+            self.n = 0
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url):
+            self.n += 1
+            if self.n > 4:
+                raise _StopLoop
+            raise poller_mod.httpx.ConnectError("boom")
+
+    monkeypatch.setattr(poller_mod.httpx, "AsyncClient", _FailingClient)
+    monkeypatch.setattr(poller_mod, "OFFLINE_THRESHOLD", 1)   # offline on first failure
+    monkeypatch.setattr(poller_mod, "POLL_INTERVAL", 0.0)     # no real waiting
+
+    sent = []
+
+    async def collect(msg):
+        sent.append(msg)
+
+    poller = StatusPoller(broadcast_fn=collect)
+    try:
+        asyncio.run(poller._loop())
+    except _StopLoop:
+        pass
+
+    agent_states = [m for m in sent if m["type"] == "agent_states"]
+    # 4 failing cycles ran before the loop was aborted -> 4 agent_states msgs.
+    assert len(agent_states) >= 3, "agent_states stopped emitting after going offline"
+    assert all(m["agents"]["deal_hunter"]["state"] == "offline" for m in agent_states)
+    # Legacy 'status' offline notice should fire exactly once (at the transition).
+    offline_status = [m for m in sent
+                      if m["type"] == "status" and m["payload"].get("state") == "offline"]
+    assert len(offline_status) == 1
+
+
 def test_frontend_handles_agent_states_message():
     """The frontend WS handler must dispatch 'agent_states' to the per-agent
     walkers (static-text contract check, not browser automation)."""
