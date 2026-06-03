@@ -1104,6 +1104,26 @@ TONER:         operational
           duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
         });
 
+        // --- Job Analyst character (new agent, commit 2a) ---
+        // Stationary agent that LLM-scores discovered jobs. Upper floor, right of
+        // Deal Hunter's writing-desk stand (420) — clear of all walking standing
+        // points. Distinct muted-red tint. No click handler yet (commit 2b).
+        const JOB_ANALYST_TINT = 0xd07f7f;
+        const jobAnalystSprite = this.add.image(480, 130, '2dpig-characters', 'deal-hunter');
+        jobAnalystSprite.setOrigin(0.5, 1);
+        jobAnalystSprite.setTint(JOB_ANALYST_TINT);
+        this.add.text(480, 104, 'JOB ANALYST', {
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: '7px',
+          color: '#f4f0e0',
+          backgroundColor: '#243845',
+          padding: { x: 3, y: 1 },
+        }).setOrigin(0.5, 1);
+        this.tweens.add({
+          targets: jobAnalystSprite, alpha: { from: 1, to: 0.7 },
+          duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+        });
+
         // Status overlay is an HTML div (#status-overlay) updated via
         // updateStatusText/applyAgentState — keeps it readable over a transparent canvas.
         updateStatusText(this);

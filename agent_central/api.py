@@ -46,6 +46,11 @@ CHUNK_WINDOW_MINUTES = 15
 # --- Job Scout config (new agent, commit 1) ---
 JOB_SCOUT_INTERVAL_SECONDS = 10800  # 3 hours
 
+# --- Job Analyst config (new agent, commit 2a) ---
+JOB_ANALYST_INTERVAL_SECONDS = 300  # 5 minutes — usually fast no-ops
+JOB_ANALYST_SCORE_THRESHOLD = 75
+PROFILE_PATH = os.path.join(_PROJECT_ROOT, "data", "profile.yaml")
+
 
 class IndexerTask:
     """Background task that periodically indexes activity_log events into the
@@ -158,14 +163,87 @@ class JobScoutTask:
             raise
 
 
+class JobAnalystTask:
+    """Background task that scores discovered jobs with Claude Haiku and posts
+    Discord notifications for high scorers. Mirrors JobScoutTask. A missing API
+    key or profile is handled gracefully (warn + skip the pass) so it can never
+    crash the process.
+    """
+
+    def __init__(self, activity_db_path: str, profile_path: str,
+                 interval_seconds: int = JOB_ANALYST_INTERVAL_SECONDS,
+                 threshold: int = JOB_ANALYST_SCORE_THRESHOLD):
+        self.activity_db_path = activity_db_path
+        self.profile_path = profile_path
+        self.interval_seconds = interval_seconds
+        self.threshold = threshold
+        self._task: Optional[asyncio.Task] = None
+        self._client = None  # lazy
+
+    async def start(self):
+        self._task = asyncio.create_task(self._loop())
+        logger.info("JobAnalystTask started")
+
+    async def stop(self):
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            logger.info("JobAnalystTask stopped")
+
+    async def _loop(self):
+        from agent_central import activity_log
+        activity_log.log_event("job_analyst", "lifecycle", state="idle",
+                               metadata={"event": "first_seen"})
+        while True:
+            try:
+                await asyncio.to_thread(self._run_pass)
+            except Exception:
+                logger.exception("Job Analyst pass failed; will retry next cycle")
+            await asyncio.sleep(self.interval_seconds)
+
+    def _run_pass(self):
+        from agent_central import job_analyst, activity_log
+
+        if not os.path.exists(self.profile_path):
+            logger.warning(f"[job_analyst] no profile at {self.profile_path}; skipping pass")
+            return
+        if self._client is None:
+            try:
+                self._client = job_analyst.JobAnalystClient()
+            except RuntimeError as e:
+                logger.warning(f"[job_analyst] {e}; skipping pass")
+                return
+
+        webhook = os.environ.get("JOB_SCOUT_DISCORD_WEBHOOK_URL")
+        activity_log.log_event("job_analyst", "state_change", state="scanning",
+                               metadata={"event": "pass_start"})
+        try:
+            stats = job_analyst.run_analyst_pass(
+                self.activity_db_path, self.profile_path, webhook, self._client,
+                threshold=self.threshold,
+            )
+            activity_log.log_event("job_analyst", "state_change", state="idle",
+                                   payload=stats, metadata={"event": "pass_complete"})
+            if stats.get("scored", 0) or stats.get("notified", 0):
+                logger.info(f"Job Analyst pass complete: {stats}")
+        except Exception:
+            activity_log.log_event("job_analyst", "error", state="error",
+                                   metadata={"event": "pass_failed"})
+            raise
+
+
 _poller: StatusPoller | None = None
 _indexer: "IndexerTask | None" = None
 _job_scout: "JobScoutTask | None" = None
+_job_analyst: "JobAnalystTask | None" = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _poller, _indexer, _job_scout
+    global _poller, _indexer, _job_scout, _job_analyst
     # Ensure the activity-log DB + schema (incl. discovered_jobs) exist first.
     activity_log.init_db(activity_log.DEFAULT_DB_PATH)
     _poller = StatusPoller(broadcast_fn=broadcast)
@@ -178,9 +256,15 @@ async def lifespan(app: FastAPI):
     await _indexer.start()
     _job_scout = JobScoutTask(activity_db_path=activity_log.DEFAULT_DB_PATH)
     await _job_scout.start()
+    _job_analyst = JobAnalystTask(
+        activity_db_path=activity_log.DEFAULT_DB_PATH,
+        profile_path=PROFILE_PATH,
+    )
+    await _job_analyst.start()
     try:
         yield
     finally:
+        await _job_analyst.stop()
         await _job_scout.stop()
         await _indexer.stop()
         await _poller.stop()

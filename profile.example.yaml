@@ -1,0 +1,27 @@
+# Job Analyst candidate profile — TEMPLATE.
+# Copy this to data/profile.yaml (gitignored) and edit with your details.
+# The Analyst scores discovered jobs against this profile via Claude Haiku.
+name: Your Name
+background: Self-taught software engineer focused on AI systems
+languages:
+  - Python (strong)
+  - JavaScript (strong)
+frameworks:
+  - FastAPI
+  - Phaser
+  - pytest
+domains:
+  - AI agents
+  - LLM integration
+  - RAG
+  - observability
+  - distributed systems
+level: Entry / Junior / 0-2 years professional
+looking_for: Remote, full-time, AI-focused startups preferred
+visa: EU citizen — no sponsorship needed for EU; needs sponsorship for US/UK
+strict_no:
+  - Senior or higher roles
+  - 3+ years professional experience required
+  - B2B contractor / one-person-company-only models
+  - Unpaid trials
+  - Roles requiring a relocation visa that can't be obtained

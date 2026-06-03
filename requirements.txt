@@ -11,3 +11,6 @@ anthropic>=0.40.0
 
 # Job Scout agent — RSS/JSON job-source discovery (commit 1)
 feedparser>=6.0
+
+# Job Analyst agent — profile YAML parsing (commit 2a)
+pyyaml>=6.0
