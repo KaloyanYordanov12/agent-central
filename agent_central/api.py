@@ -403,6 +403,41 @@ async def secretary_ask(payload: AskRequest):
     return result
 
 
+# --- Jobs / cost read-only endpoints (commit 2b) ---
+@app.get("/api/jobs/discovered")
+def jobs_discovered(source: Optional[str] = None, status: Optional[str] = None,
+                    limit: int = 50):
+    """Discovered jobs (newest first) + status/source breakdowns."""
+    from agent_central import job_scout
+    try:
+        return job_scout.get_discovered(activity_log._DB_PATH, source=source,
+                                        status=status, limit=limit)
+    except Exception:
+        logger.exception("jobs/discovered failed")
+        raise HTTPException(status_code=500, detail="failed to load discovered jobs")
+
+
+@app.get("/api/jobs/analyst-activity")
+def jobs_analyst_activity(limit: int = 20):
+    """Recent Job Analyst scoring activity + today's summary."""
+    from agent_central import job_analyst
+    try:
+        return job_analyst.get_recent_activity(activity_log._DB_PATH, limit=limit)
+    except Exception:
+        logger.exception("jobs/analyst-activity failed")
+        raise HTTPException(status_code=500, detail="failed to load analyst activity")
+
+
+@app.get("/api/llm-costs/today")
+def llm_costs_today():
+    """Today's (UTC) aggregated LLM spend for the Cost Today indicator."""
+    try:
+        return activity_log.get_costs_today(activity_log._DB_PATH)
+    except Exception:
+        logger.exception("llm-costs/today failed")
+        raise HTTPException(status_code=500, detail="failed to load llm costs")
+
+
 # Serve the command center UI
 @app.get("/")
 def root():

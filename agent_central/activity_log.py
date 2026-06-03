@@ -333,3 +333,38 @@ def log_llm_call(agent_id, model, purpose, input_tokens, output_tokens,
         return int(cur.lastrowid)
     finally:
         conn.close()
+
+
+def get_costs_today(db_path: Optional[str] = None) -> dict:
+    """Aggregate today's (UTC) LLM spend from llm_calls for the cost indicator.
+
+    Returns {date, total_usd, by_agent, by_model, call_count}. "Today" is the
+    server's UTC calendar day (see the production-smell note).
+    """
+    db_path = db_path or _DB_PATH
+    today = datetime.now(timezone.utc).date().isoformat()
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            "SELECT agent_id, model, estimated_cost_usd FROM llm_calls "
+            "WHERE substr(timestamp, 1, 10) = ?",
+            (today,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    by_agent, by_model, total, count = {}, {}, 0.0, 0
+    for r in rows:
+        count += 1
+        cost = r["estimated_cost_usd"] or 0.0
+        total += cost
+        by_agent[r["agent_id"]] = round(by_agent.get(r["agent_id"], 0.0) + cost, 8)
+        by_model[r["model"]] = round(by_model.get(r["model"], 0.0) + cost, 8)
+    return {
+        "date": today,
+        "total_usd": round(total, 8),
+        "by_agent": by_agent,
+        "by_model": by_model,
+        "call_count": count,
+    }

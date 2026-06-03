@@ -226,3 +226,56 @@ def run_scout_pass(db_path: str) -> dict:
 
     stats = store_jobs(jobs, db_path)
     return stats
+
+
+def get_discovered(db_path: str, source: Optional[str] = None,
+                   status: Optional[str] = None, limit: int = 50) -> dict:
+    """Read-only view of discovered jobs (newest first) + status/source counts.
+
+    `limit` is clamped to [1, 200]. Filters are optional. Used by the
+    /api/jobs/discovered endpoint (commit 2b).
+    """
+    limit = max(1, min(int(limit), 200))
+    clauses, params = [], []
+    if source:
+        clauses.append("source = ?")
+        params.append(source)
+    if status:
+        clauses.append("status = ?")
+        params.append(status)
+    where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            "SELECT url, source, title, company, location, discovered_at, status, "
+            "filter_reason, llm_score, llm_reasoning, llm_red_flags, notified_at "
+            "FROM discovered_jobs" + where + " ORDER BY discovered_at DESC LIMIT ?",
+            params + [limit],
+        ).fetchall()
+        status_counts = conn.execute(
+            "SELECT status, COUNT(*) AS c FROM discovered_jobs GROUP BY status"
+        ).fetchall()
+        source_counts = conn.execute(
+            "SELECT source, COUNT(*) AS c FROM discovered_jobs GROUP BY source"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    jobs = []
+    for r in rows:
+        jobs.append({
+            "url": r["url"], "source": r["source"], "title": r["title"],
+            "company": r["company"], "location": r["location"],
+            "discovered_at": r["discovered_at"], "status": r["status"],
+            "filter_reason": r["filter_reason"], "llm_score": r["llm_score"],
+            "llm_reasoning": r["llm_reasoning"],
+            "llm_red_flags": json.loads(r["llm_red_flags"]) if r["llm_red_flags"] else [],
+            "notified_at": r["notified_at"],
+        })
+    return {
+        "jobs": jobs,
+        "stats_by_status": {row["status"]: row["c"] for row in status_counts},
+        "stats_by_source": {row["source"]: row["c"] for row in source_counts},
+    }

@@ -308,3 +308,48 @@ def run_analyst_pass(db_path: str, profile_path: str, webhook_url: Optional[str]
         "notified": notif["notified"],
         "notify_errors": notif["errors"],
     }
+
+
+def get_recent_activity(db_path: str, limit: int = 20) -> dict:
+    """Read-only view of recent LLM-scored jobs + today's summary.
+
+    `limit` is clamped to [1, 100]. "Today" uses the UTC date prefix of
+    discovered_at as a proxy for scored_at. Used by /api/jobs/analyst-activity.
+    """
+    limit = max(1, min(int(limit), 100))
+    today = datetime.now(timezone.utc).date().isoformat()
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            "SELECT title, company, url, llm_score, discovered_at, notified_at, "
+            "llm_reasoning FROM discovered_jobs WHERE llm_score IS NOT NULL "
+            "ORDER BY discovered_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        today_rows = conn.execute(
+            "SELECT llm_score, notified_at FROM discovered_jobs "
+            "WHERE llm_score IS NOT NULL AND substr(discovered_at, 1, 10) = ?",
+            (today,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    recent_scores = []
+    for r in rows:
+        recent_scores.append({
+            "title": r["title"], "company": r["company"], "url": r["url"],
+            "score": r["llm_score"], "scored_at": r["discovered_at"],
+            "notified": bool(r["notified_at"]),
+            "reasoning_preview": (r["llm_reasoning"] or "")[:200],
+        })
+
+    today_scores = [r["llm_score"] for r in today_rows]
+    summary = {
+        "scored_today": len(today_scores),
+        "notified_today": sum(1 for r in today_rows if r["notified_at"]),
+        "avg_score_today": round(sum(today_scores) / len(today_scores), 1) if today_scores else 0,
+        "top_score_today": max(today_scores) if today_scores else 0,
+    }
+    return {"recent_scores": recent_scores, "summary": summary}

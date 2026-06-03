@@ -444,6 +444,15 @@
     .ask-input-row button:disabled { opacity: 0.5; cursor: default; }
     .sec-muted { color: #8b6534; font-style: italic; }
     .sec-error { color: #a02828; }
+    /* Job Analyst score badges (commit 2b) */
+    .job-score-badge {
+      display: inline-block; min-width: 24px; text-align: center;
+      font-weight: 700; font-size: 11px; padding: 1px 5px; margin-right: 6px;
+      border-radius: 3px; color: #f4f0e0;
+    }
+    .job-score-high { background: #2e8a3e; }   /* >= 75 */
+    .job-score-mid  { background: #b8860b; }    /* 50-74 */
+    .job-score-low  { background: #a02828; }    /* < 50 */
   </style>
 </head>
 <body>
@@ -462,6 +471,15 @@ STATE: idle</div>
       <div class="zone-led" id="zone-led-writingDesk"></div>
       <div class="zone-led" id="zone-led-lounge"></div>
       <div class="zone-led" id="zone-led-research"></div>
+
+      <!-- Cost Today indicator (commit 2b): running LLM spend, polled every 60s -->
+      <div id="cost-today-indicator"
+           style="position: absolute; top: 8px; right: 8px;
+                  font-family: 'JetBrains Mono', monospace; font-size: 10px;
+                  color: #f4f0e0; background: rgba(36, 56, 69, 0.85);
+                  padding: 4px 8px; border-radius: 3px; pointer-events: none; z-index: 10;">
+        LLM today: --
+      </div>
     </div>
   </div>
 
@@ -514,7 +532,81 @@ STATE: idle</div>
     </div>
   </div>
 
+  <!-- Job Scout popup (commit 2b): Recent Discoveries + Stats over /api/jobs/discovered -->
+  <div id="job-scout-popup" class="secretary-popup hidden">
+    <div class="secretary-popup-backdrop"></div>
+    <div class="secretary-popup-content">
+      <div class="secretary-popup-header">
+        <h2>JOB SCOUT</h2>
+        <button class="secretary-popup-close" aria-label="Close">×</button>
+      </div>
+      <div class="secretary-popup-tabs">
+        <button class="tab-button active" data-tab="discoveries">Recent Discoveries</button>
+        <button class="tab-button" data-tab="stats">Stats</button>
+      </div>
+      <div class="secretary-popup-body">
+        <div class="tab-panel" data-panel="discoveries">
+          <div class="history-filters">
+            <select id="js-source-filter">
+              <option value="">All sources</option>
+              <option value="aijobs">aijobs</option>
+              <option value="remotive">remotive</option>
+              <option value="remoteok">remoteok</option>
+            </select>
+          </div>
+          <div class="history-list" id="js-discoveries-list"></div>
+        </div>
+        <div class="tab-panel hidden" data-panel="stats">
+          <div class="history-list" id="js-stats"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Job Analyst popup (commit 2b): Recent Scores + Today's Summary over /api/jobs/analyst-activity -->
+  <div id="job-analyst-popup" class="secretary-popup hidden">
+    <div class="secretary-popup-backdrop"></div>
+    <div class="secretary-popup-content">
+      <div class="secretary-popup-header">
+        <h2>JOB ANALYST</h2>
+        <button class="secretary-popup-close" aria-label="Close">×</button>
+      </div>
+      <div class="secretary-popup-tabs">
+        <button class="tab-button active" data-tab="scores">Recent Scores</button>
+        <button class="tab-button" data-tab="summary">Today's Summary</button>
+      </div>
+      <div class="secretary-popup-body">
+        <div class="tab-panel" data-panel="scores">
+          <div class="history-list" id="ja-scores-list"></div>
+        </div>
+        <div class="tab-panel hidden" data-panel="summary">
+          <div class="history-list" id="ja-summary"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="/static/secretary.js"></script>
+  <script src="/static/job_scout.js"></script>
+  <script src="/static/job_analyst.js"></script>
+  <script>
+    // Cost Today indicator — poll today's LLM spend every 60s (commit 2b).
+    function refreshCostIndicator() {
+      fetch('/api/llm-costs/today')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!data) return;
+          const el = document.getElementById('cost-today-indicator');
+          if (el) {
+            const usd = (data.total_usd || 0).toFixed(4);
+            el.textContent = `LLM today: $${usd} (${data.call_count || 0} calls)`;
+          }
+        })
+        .catch(() => { /* silent — don't break the UI */ });
+    }
+    refreshCostIndicator();
+    setInterval(refreshCostIndicator, 60000);
+  </script>
 
   <script>
     // ============================================================
@@ -1103,6 +1195,15 @@ TONER:         operational
           targets: jobScoutSprite, alpha: { from: 1, to: 0.7 },
           duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
         });
+        // Click -> Job Scout popup (commit 2b), with highlight while open.
+        jobScoutSprite.setInteractive({ cursor: 'pointer', useHandCursor: true });
+        jobScoutSprite.on('pointerdown', () => {
+          if (window.openJobScoutPopup) window.openJobScoutPopup();
+        });
+        window.setJobScoutGlow = (on) => {
+          if (on) jobScoutSprite.clearTint();
+          else jobScoutSprite.setTint(JOB_SCOUT_TINT);
+        };
 
         // --- Job Analyst character (new agent, commit 2a) ---
         // Stationary agent that LLM-scores discovered jobs. Upper floor, right of
@@ -1123,6 +1224,15 @@ TONER:         operational
           targets: jobAnalystSprite, alpha: { from: 1, to: 0.7 },
           duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
         });
+        // Click -> Job Analyst popup (commit 2b), with highlight while open.
+        jobAnalystSprite.setInteractive({ cursor: 'pointer', useHandCursor: true });
+        jobAnalystSprite.on('pointerdown', () => {
+          if (window.openJobAnalystPopup) window.openJobAnalystPopup();
+        });
+        window.setJobAnalystGlow = (on) => {
+          if (on) jobAnalystSprite.clearTint();
+          else jobAnalystSprite.setTint(JOB_ANALYST_TINT);
+        };
 
         // Status overlay is an HTML div (#status-overlay) updated via
         // updateStatusText/applyAgentState — keeps it readable over a transparent canvas.
