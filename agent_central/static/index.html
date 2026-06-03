@@ -156,34 +156,6 @@
     .building-sign::before { left: 20%; }
     .building-sign::after  { right: 20%; }
 
-    /* Status overlay — navy mounted plaque matching the AGENT CENTRAL sign.
-       Corner "screws" from the spec are omitted (fallback): the box-shadow
-       corner trick used percentage offsets, invalid in box-shadow, so only
-       left-side dots would render. The plaque reads cleanly without them. */
-    .status-overlay {
-      position: absolute;
-      top: 30px;
-      left: 16px;
-      background: #243845;
-      color: #f4f0e0;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      padding: 8px 12px;
-      z-index: 10;
-      white-space: pre-line;
-      line-height: 1.5;
-      letter-spacing: 0.3px;
-      pointer-events: none;
-      border: 2px solid #1a2935;
-      border-radius: 2px;
-      box-shadow:
-        /* Inner subtle highlight at top for "mounted plaque" feel */
-        inset 0 1px 0 rgba(244, 240, 224, 0.08),
-        /* Outer drop shadow grounding it on the office wall */
-        0 2px 6px rgba(0, 0, 0, 0.4);
-      min-width: 180px;
-    }
-
     /* Zone LED status indicators — one small lit dot above where the character
        stands in each zone. Only the active zone's LED lights up. Coords are
        display space: native (x,y) from ZONE_MAP * 1.5, top offset ~50px up to
@@ -460,9 +432,6 @@
   <div class="world-wrapper">
     <div class="building">
       <div class="building-sign">AGENT CENTRAL</div>
-      <div class="status-overlay" id="status-overlay">AGENT: deal_hunter
-ZONE: OPERATIONS
-STATE: idle</div>
       <div id="game-container"></div>
 
       <!-- Zone LEDs — one per zone the character walks to (F.2c-zone-leds) -->
@@ -692,16 +661,7 @@ STATE: idle</div>
       if (demoMode) return;
 
       const state = payload.state;
-      const action = payload.current_action || '';
       isOffline = (state === 'offline');
-
-      const zone = ZONE_MAP[scene.currentZone];
-      const stateLine = isOffline
-        ? 'STATE: offline'
-        : `STATE: ${scene.isWalking ? 'walking' : 'idle'} (${state})`;
-      const overlay = document.getElementById('status-overlay');
-      overlay.textContent = `AGENT: deal_hunter\nZONE: ${zone.label}\n${stateLine}\nACTION: ${action}`;
-      overlay.style.color = isOffline ? '#ff3b30' : '#f4f0e0';
 
       // Light the LED for the zone this state maps to (fall back to current zone).
       const ledZone = STATE_TO_ZONE[state] || scene.currentZone;
@@ -767,11 +727,10 @@ STATE: idle</div>
       }
     }
 
+    // Drives the zone LEDs from Deal Hunter's current zone. (The old on-canvas
+    // status-overlay text was removed; the per-agent following labels + wall
+    // plaques now carry that context. Name kept so existing callers are unchanged.)
     function updateStatusText(scene) {
-      const zone = ZONE_MAP[scene.currentZone];
-      const state = scene.isWalking ? 'walking' : 'idle';
-      const overlay = document.getElementById('status-overlay');
-      overlay.textContent = `AGENT: deal_hunter\nZONE: ${zone.label}\nSTATE: ${state}`;
       setMonitorState(zoneToState(scene.currentZone), scene.currentZone);
     }
 
@@ -958,17 +917,17 @@ STATE: idle</div>
       document.getElementById('popup').style.display = 'none';
     }
 
-    // Character popup — uses live data from the status overlay (kept current by applyAgentState).
+    // Character popup. The on-canvas status overlay was removed; null-guard the
+    // optional read so the Deal Hunter click never throws if it is absent.
     function buildCharacterPopup() {
-      const overlay = document.getElementById('status-overlay').textContent;
+      const overlayEl = document.getElementById('status-overlay');
+      const overlay = overlayEl ? overlayEl.textContent + '\n\n' : '';
       return `
 <div class="popup-title">AGENT PROFILE</div>
 NAME:    Deal Hunter
 ROLE:    Reddit lead scout
 STATUS:  Active
-${overlay}
-
-CYCLES:  --
+${overlay}CYCLES:  --
 UPTIME:  --
       `.trim();
     }
@@ -1119,7 +1078,7 @@ TONER:         operational
       preload() {
         this.load.image(
           'rixitic-example',
-          '/static/assets/tilesets/rixitic-sidescroller-office/example-transparent.png'
+          '/static/assets/tilesets/rixitic-sidescroller-office/example-v2-transparent.png'
         );
         this.load.image(
           '2dpig-characters',
@@ -1252,10 +1211,11 @@ TONER:         operational
           else secretarySprite.setTint(SECRETARY_TINT);
         };
         // Cosmetic wander — Secretary has no scheduled backend state to couple
-        // to, so it just drifts a little to add life (params per spec D).
+        // to, so it just drifts a little to add life. Centered on the reception
+        // counter (cols 11-14): small drift behind it, never off to the elevator.
         setupSecretaryCosmeticWander(this, secretarySprite, {
           home: 200,
-          awayPositions: [160, 240],
+          awayPositions: [180, 225],
           walkDurationMs: 4000,
           idleAtHomeMinMs: 60000,   // 60-120s between wanders — mostly still
           idleAtHomeMaxMs: 120000,
@@ -1266,15 +1226,14 @@ TONER:         operational
 
         // --- Job Scout character (new agent, commit 1) ---
         // Stationary agent that discovers job listings from public sources.
-        // Lower-floor right (between the cubicles/research stand and the water
-        // cooler), opposite the Secretary. Distinct green-yellow tint. No click
-        // handler yet — the popup UI comes in commit 2.
+        // Stands in the monitor bay (v2 layout): under the monitor bank on the
+        // lower floor, around col 25 (x400). Distinct green-yellow tint.
         const JOB_SCOUT_TINT = 0xb8d070;
-        const jobScoutSprite = this.add.image(560, 290, '2dpig-characters', 'deal-hunter');
+        const jobScoutSprite = this.add.image(400, 290, '2dpig-characters', 'deal-hunter');
         jobScoutSprite.setOrigin(0.5, 1);
         jobScoutSprite.setTint(JOB_SCOUT_TINT);
         this.jobScoutSprite = jobScoutSprite;
-        this.jobScoutLabel = this.add.text(560, 264, 'JOB SCOUT', {
+        this.jobScoutLabel = this.add.text(400, 264, 'JOB SCOUT', {
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: '7px',
           color: '#f4f0e0',
@@ -1294,9 +1253,9 @@ TONER:         operational
           if (on) jobScoutSprite.clearTint();
           else jobScoutSprite.setTint(JOB_SCOUT_TINT);
         };
-        // State-coupled walking: home (560) at station, away (640) toward the
-        // right wall while scanning sources.
-        const jobScoutWalker = makeCoupledWalker(this, jobScoutSprite, 560, 640, jobScoutPulse);
+        // State-coupled walking: home (400) under the monitor bank, away (460)
+        // a short local step right within the bay while scanning sources.
+        const jobScoutWalker = makeCoupledWalker(this, jobScoutSprite, 400, 460, jobScoutPulse);
 
         // --- Job Analyst character (new agent, commit 2a) ---
         // Stationary agent that LLM-scores discovered jobs. Upper floor, right of
@@ -1331,8 +1290,8 @@ TONER:         operational
         // consult data/references while scanning.
         const jobAnalystWalker = makeCoupledWalker(this, jobAnalystSprite, 480, 380, jobAnalystPulse);
 
-        // Status overlay is an HTML div (#status-overlay) updated via
-        // updateStatusText/applyAgentState — keeps it readable over a transparent canvas.
+        // Initialize the zone LEDs for the starting zone (updateStatusText now
+        // only drives the LEDs; the on-canvas status text box was removed).
         updateStatusText(this);
 
         // Debug keyboard shortcuts — 1..5 walk Deal Hunter to each zone.
