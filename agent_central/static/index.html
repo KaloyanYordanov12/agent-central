@@ -440,18 +440,6 @@
     .jf-notified { background: #2bd66f; }
     .jf-empty { font-size: 10.5px; color: rgba(244,240,224,0.55); }
 
-    /* In-world "Live metrics" terminal affordance over the Control screens (B) */
-    .metrics-terminal {
-      position: absolute; z-index: 7; cursor: pointer;
-      transform: translateX(-50%);
-      font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
-      letter-spacing: 1px; color: #11151d; background: #ffce5c;
-      border: 1px solid #ffb000; padding: 3px 9px; border-radius: 4px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.4); white-space: nowrap;
-      animation: term-pulse 2.4s ease-in-out infinite;
-    }
-    .metrics-terminal:hover { background: #fff3d8; }
-    @keyframes term-pulse { 0%,100%{ box-shadow:0 2px 8px rgba(0,0,0,0.4);} 50%{ box-shadow:0 0 12px rgba(255,176,0,0.8);} }
 
     /* B metrics dashboard (Tier 1 console). Reuses the dark modal shell, wider. */
     .dash-content { width: 940px !important; height: 86vh !important; max-height: 680px !important; }
@@ -520,9 +508,6 @@
     <div class="building">
       <div class="building-sign">AGENT CENTRAL</div>
       <div id="game-container"></div>
-      <!-- B: discoverable in-world terminal over the Control screens -> dashboard -->
-      <div class="metrics-terminal" id="metrics-terminal" style="left:360px; top:120px;"
-           title="Open the live metrics dashboard">&#9638; LIVE METRICS</div>
 
     </div>
   </div>
@@ -1566,7 +1551,6 @@
       document.getElementById('dash-close').addEventListener('click', closeDashboard);
       popup.querySelector('.secretary-popup-backdrop').addEventListener('click', closeDashboard);
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !popup.classList.contains('hidden')) closeDashboard(); });
-      const term = document.getElementById('metrics-terminal'); if (term) term.addEventListener('click', openDashboard);
       window.openDashboard = openDashboard; window.closeDashboard = closeDashboard;
     })();
   </script>
