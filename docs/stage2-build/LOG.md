@@ -170,3 +170,33 @@ real always-on legibility and honest-degradation behavior. No em-dashes added
 Note: scripted screenshots now disable the browser cache (Network.setCacheDisabled)
 so freshly edited static JS/CSS is always captured.
 
+## Final summary
+
+Engine diagnosis: the 4,592 logged HTTP 400s were all "credit balance is too low",
+not a code/request bug. Proven by 127 successful calls on the same code path
+(model `claude-haiku-4-5`, `cache_control ttl:1h`) and a same-day fail-then-succeed
+transition. No request code needed changing; credit has since been funded.
+
+Real Anthropic API calls spent this run: 1 (one minimal Haiku verification call,
+14 in / 4 output tokens, ~$0.00003). It succeeded. Hard ceiling was 10. All server
+runs were done with ANTHROPIC_API_KEY unset so the analyst paused (F4) and spent
+nothing; the legibility work needs no API.
+
+Shipped (each its own commit, backend suite green at every step, CDP-verified):
+- F4 analyst backoff: fatal-error detection aborts a pass and pauses the agent.
+- F1 honest cost ticker: successful spend/tokens vs a separate failed-call count.
+- D1 live activity ticker. A3 always-on status HUD. A2 room labels + zone legend.
+- A1 cold-open onboarding. A4 honest offline/reconnecting banner. D3 jobs funnel.
+- F2 README reconciled with reality. F3 friendly empty/error states.
+
+Out of scope (left for the next run, untouched): popup redesign (C1/C2), bigger
+building / B-group polish, replay/demo modes (E1/E2), dashboard toggle (D2),
+frontend refactor (G1).
+
+Test status: 101 backend tests passing (was 98 at the start; +3 for F1/F4).
+Screenshots: this folder (`docs/stage2-build/`). Final composed views:
+`final-01-cold-open.png`, `final-02-legible-office.png`.
+
+Stopped at a clean working state on branch `stage2-legibility`. Not merged to
+master; no premium/wow/popup work done.
+
