@@ -4,8 +4,8 @@
 
 https://github.com/user-attachments/assets/d029066d-9fd6-4c90-8a44-6409291fa107
 
-**Live demo:** https://remove-procedures-deliver-letters.trycloudflare.com/?demo=true
-**Built:** May–June 2026, ~48 hours from skeleton to shipped
+**Run it:** locally on `127.0.0.1:8001` (see "Running it locally"). Public demos have used ephemeral cloudflared quick-tunnels, so there is no permanent hosted link.
+**Built:** May to June 2026, ~48 hours from skeleton to shipped
 
 ---
 
@@ -34,9 +34,9 @@ The deeper design idea: agents are workers. They have shifts, tasks, downtime. V
 - **Watches an AI agent's pipeline state in real time** via WebSocket
 - **Maps agent state to physical zones** in a pixel-art office (operations, communications, writing desk, research, lounge)
 - **Drives an autonomous character** that walks between zones, takes elevators between floors
-- **Surfaces state through colored LEDs** above the character (blue = scanning, green = researching, magenta = writing, cyan = posting)
-- **Offers 8 clickable interactive elements** with quest-screen-style popups: agent profile, workstation info, metrics whiteboard, water cooler easter egg, system info panel, team overview, outside-world API health, printer activity log
-- **Supports demo mode** (`?demo=true`) for keyboard-driven walkthroughs when the backend isn't actively producing state events
+- **Surfaces live state everywhere you look:** an always-on status strip (one row per agent with state, current action, and "updated Ns ago"), a scrolling activity ticker narrating real events from the activity log, a jobs pipeline funnel, labelled rooms, and a work bubble above an agent when it is at a desk
+- **Offers clickable interactive elements** with quest-screen-style popups: each agent, the control-room screens (live LLM spend/usage), and flavor objects around the office
+- **Onboards a cold viewer** with a dismissible intro card, and **degrades honestly**: an offline agent dims and a calm banner explains its separate service is not running (offline, not broken)
 
 ---
 
@@ -47,11 +47,11 @@ Two-service distributed system:
 ```
 ┌─────────────────┐        ┌──────────────────┐         ┌──────────────────┐
 │   Deal Hunter   │        │  Agent Central   │         │   Browser UI     │
-│  (port 8000)    │        │  (port 8001)     │         │  (Phaser + CSS)  │
+│  (port 8000)    │        │  (port 8001)     │         │  (Canvas + CSS)  │
 │                 │        │                  │         │                  │
-│  Reddit scanner │ HTTP   │  FastAPI server  │ WS push │  Character +     │
-│  + dashboard    ├───────▶│  + status poller ├────────▶│  zone LEDs +     │
-│                 │ /status│                  │         │  popups          │
+│  Reddit scanner │ HTTP   │  FastAPI server  │ WS push │  Office + walking│
+│  + dashboard    ├───────▶│  + status poller ├────────▶│  agents + HUD +  │
+│                 │ /status│                  │         │  ticker + popups │
 └─────────────────┘  poll  └──────────────────┘         └──────────────────┘
 ```
 
@@ -59,18 +59,18 @@ Two-service distributed system:
 
 **Why WebSocket fan-out:** Multiple browser clients can watch the same agent simultaneously. Cheap to add, plays nicely with browser reconnects.
 
-**Why Phaser for the office:** I needed pixel-art rendering, animated character movement, and zone-based tweening. Phaser handles all three. The world chrome around it (sky background, building, popups, LEDs) is HTML/CSS — pure browser primitives are more reliable than fighting Phaser's quirks for static layout.
+**Why a hand-rolled canvas for the office:** the building and the walking agents are drawn on a single HTML5 canvas (an offscreen buffer rendered at native pixel size, then blitted scaled with smoothing off for crisp pixel art) on a `requestAnimationFrame` loop, with A* / Dijkstra pathfinding over a walkable node graph. An earlier iteration used Phaser; the raw-canvas rewrite is smaller and gives full control over the pixel grid. The world chrome around the canvas (sky background, status HUD, activity ticker, zone legend, jobs funnel, popups) is plain HTML/CSS, which is more reliable for static overlays.
 
 ---
 
 ## Tech stack
 
 - **Backend:** FastAPI, uvicorn, websockets, httpx
-- **Frontend:** Phaser 3.90, vanilla HTML/CSS/JS
+- **Frontend:** vanilla HTML/CSS/JS with a hand-rolled HTML5 canvas renderer (no framework)
 - **Art:** Custom pixel art from [rixitic](https://rixitic.itch.io/) (interior tileset, $1 strategic asset purchase) + [2dPig](https://2dpig.itch.io/) (character sprites) + AI-generated background
-- **Testing:** pytest, pytest-asyncio (50 backend tests covering the API, status polling, WebSocket, activity logging, the background indexer, and the RAG endpoint; CI-validated)
+- **Testing:** pytest, pytest-asyncio (100+ backend tests covering the API, status polling, WebSocket, activity logging, the background indexer, the RAG endpoint, the jobs/cost endpoints, and the Job Analyst including its backoff; CI-validated)
 - **CI:** GitHub Actions, runs tests on every push and PR
-- **Deployment:** uvicorn locally, cloudflared quick-tunnels for remote demos
+- **Deployment:** uvicorn locally; past public demos used ephemeral cloudflared quick-tunnels, so there is no permanent hosted URL
 
 ---
 
@@ -86,11 +86,13 @@ cd agentcentral
 .\venv\Scripts\python.exe -m uvicorn agent_central.api:app --host 127.0.0.1 --port 8001
 
 # 3. Open in browser
-# Production view:           http://127.0.0.1:8001
-# Demo mode (keyboard test): http://127.0.0.1:8001/?demo=true
+#   http://127.0.0.1:8001
 ```
 
-In demo mode, keys 1-5 walk the character between zones manually. The D key toggles demo mode on/off mid-session.
+Agent Central runs on its own (port 8001): the office, the status HUD, the
+activity ticker, the jobs funnel, and the popups all work from its own data even
+when Deal Hunter (port 8000) is not running. In that case Deal Hunter simply shows
+as offline (with a calm banner that says so) and the other agents keep updating.
 
 ---
 
@@ -106,7 +108,7 @@ pytest tests/ -v
 
 The test suite covers backend endpoints (`/health`, `/api/agents`, static serving), the WebSocket connection lifecycle, the `broadcast()` helper, the `StatusPoller` initial state, the agent-state / `STATE_TO_ZONE` contracts, the activity log (SQLite IPC + `/api/secretary/history`), the background indexer (chunking, summarization, embeddings, vector store, index-pass idempotency), and the Secretary RAG layer (`/api/secretary/ask`, with the Anthropic client mocked — no real API calls). CI runs them on every push and PR via GitHub Actions.
 
-Frontend tests (Phaser scene, browser automation) are intentionally out of scope for this iteration — Playwright setup overhead isn't worth it for a single-developer project at this stage.
+Frontend tests (canvas scene, browser automation) are intentionally out of scope for this iteration. The visual layer is verified by hand and with scripted Chrome DevTools Protocol screenshots instead.
 
 ---
 
@@ -139,9 +141,9 @@ The demo video at the top of this README shows the original office before the Se
 
 ## Status
 
-**What works:** Everything in this README. The system runs, the character walks, the popups open, the LEDs track state, the tunnel exposes it externally for sharing, and the test suite is green.
+**What works:** Everything in this README. The system runs, the agents walk between rooms, the popups open, the always-on status HUD and activity ticker track live state, the jobs funnel shows the real pipeline, and the test suite is green.
 
-**What's pending:** Deal Hunter's Reddit scanner is currently blocked on a 403 from Reddit's CDN — they've tightened their bot detection beyond what a header workaround can solve. Restoring it requires either PRAW pre-approval (Reddit's official policy, multi-week approval process) or rotating residential proxies. The architecture is platform-agnostic — once data flows in, the visualization pipeline reacts in real time.
+**What's pending:** Deal Hunter's Reddit scanner is currently blocked on a 403 from Reddit's CDN; they have tightened their bot detection beyond what a header workaround can solve. Restoring it requires either PRAW pre-approval (Reddit's official policy, a multi-week approval process) or rotating residential proxies. The architecture is platform-agnostic: once data flows in, the visualization pipeline reacts in real time.
 
 **What's next:** Multi-agent support (the Agent base class + registry is already there; just need to add the second agent), expanding zone interactions, and a more sophisticated background.
 
@@ -155,7 +157,9 @@ Some design decisions worth flagging because they shaped the whole thing:
 
 **Navy mounted status plaque, not a corner HUD:** The AGENT CENTRAL sign on the building's roof established a visual language (navy plate, off-white text, JetBrains Mono). The status overlay inside the building uses the same palette so it reads as a mounted info plaque on the building's interior wall, not as floating UI.
 
-**Demo mode flag:** Building a state visualization for events that don't fire is frustrating. The `?demo=true` flag bypasses the WebSocket and lets keyboard inputs drive the system directly. Same character, same LEDs, same popups, just with manual triggers. Real WebSocket events take over the moment demo mode is off.
+**Always-on legibility over hidden depth:** the strongest part of the story is that this is a real, measurable system, so that state is surfaced up front rather than hidden behind clicks. A status strip, a live activity ticker narrating real events, labelled rooms with a zone legend, and a jobs pipeline funnel mean a first-time viewer understands what they are looking at in a few seconds, and that it is driven by real agents.
+
+**Honest degradation, nothing faked:** when a backend agent's service is not running, that agent dims and a calm banner explains it is offline (not broken), and the cost ticker separates successful LLM spend from failed calls rather than reporting failures as free calls. The goal is that nothing on screen overstates what the system is actually doing.
 
 ---
 

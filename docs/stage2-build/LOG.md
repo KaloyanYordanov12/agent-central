@@ -144,3 +144,15 @@ exist yet. Read-only. Verified with real data: Found 164, Filter-rejected 34,
 LLM-rejected 124, Scored 3, Notified 0. Screenshots: `d3-full.png`,
 `d3-funnel-zoom.png`.
 
+### F2 README reconciled with reality (shipped)
+
+Fixed claims that no longer match the build: removed the `?demo=true` keyboard
+demo mode and the colored-LED description (the build uses work bubbles plus the
+new always-on HUD/ticker); corrected the renderer from "Phaser 3.90" to the
+hand-rolled HTML5 canvas it actually is (with a note that an earlier iteration
+used Phaser); replaced the dead cloudflared quick-tunnel "Live demo" link with an
+honest "run it locally, no permanent hosted URL" note; updated the test count and
+the architecture diagram; and rewrote the design-notes section to describe the
+real always-on legibility and honest-degradation behavior. No em-dashes added
+(the dozen pre-existing ones live in sections I did not touch).
+
