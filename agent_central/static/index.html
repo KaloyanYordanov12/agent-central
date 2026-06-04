@@ -263,6 +263,35 @@
     .job-score-high { background: #2e8a3e; }   /* >= 75 */
     .job-score-mid  { background: #b8860b; }    /* 50-74 */
     .job-score-low  { background: #a02828; }    /* < 50 */
+
+    /* D1 live activity ticker — a bottom news-crawl narrating real backend events */
+    .activity-ticker {
+      position: fixed; left: 0; right: 0; bottom: 0; height: 30px; z-index: 900;
+      display: flex; align-items: center;
+      background: rgba(10, 12, 18, 0.92); border-top: 1px solid rgba(255,176,0,0.35);
+      font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #ffce5c;
+      overflow: hidden;
+    }
+    .tk-label {
+      flex: none; align-self: stretch; display: flex; align-items: center;
+      background: #a02828; color: #fff3d8; font-weight: 700; letter-spacing: 1px;
+      padding: 0 10px; font-size: 11px;
+    }
+    .tk-label .tk-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: #ff5b5b;
+      margin-right: 6px; animation: tk-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes tk-pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+    .tk-track { flex: 1; overflow: hidden; white-space: nowrap; }
+    .tk-content {
+      display: inline-block; white-space: nowrap; padding-left: 100%;
+      animation: tk-scroll linear infinite;
+    }
+    .tk-content:hover { animation-play-state: paused; }
+    .tk-sep { color: rgba(255,176,0,0.4); margin: 0 14px; }
+    .tk-ag { font-weight: 700; }
+    .tk-time { color: rgba(255,176,0,0.45); margin-right: 5px; }
+    @keyframes tk-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
   </style>
 </head>
 <body>
@@ -286,6 +315,12 @@
   <div class="popup" id="popup" style="display: none;">
     <button class="popup-close" id="popup-close">×</button>
     <div class="popup-content" id="popup-content"></div>
+  </div>
+
+  <!-- D1 live activity ticker: real events from the activity log, newest first -->
+  <div class="activity-ticker" id="activity-ticker" aria-label="Live agent activity">
+    <span class="tk-label"><span class="tk-dot"></span>LIVE</span>
+    <div class="tk-track"><div class="tk-content" id="tk-content">connecting to the live activity feed...</div></div>
   </div>
 
   <!-- Secretary popup (Step 4): History + Ask tabs over /api/secretary/* -->
@@ -830,6 +865,94 @@
 
     let pend=Object.keys(SRC).length;
     for(const k in SRC){ const im=new Image(); im.onload=()=>{ if(--pend===0) start(); }; im.onerror=()=>{ console.error('asset fail',SRC[k]); if(--pend===0) start(); }; im.src=ASSET+SRC[k]; IMG[k]=im; }
+  </script>
+
+  <script>
+    // ===================================================================
+    // D1 LIVE ACTIVITY TICKER — narrates real events from /api/secretary/history
+    // (the append-only activity log). Read-only; refreshes every 6s. Factual tone.
+    // ===================================================================
+    (function () {
+      "use strict";
+      const NAMES = { deal_hunter: 'Deal Hunter', job_scout: 'Job Scout',
+                      job_analyst: 'Job Analyst', secretary: 'Secretary' };
+      const COLORS = { deal_hunter: '#ffce5c', job_scout: '#5fd0ff',
+                       job_analyst: '#ff8a72', secretary: '#c79bff' };
+      const STATE_VERB = {
+        scanning: 'started scanning', qualifying: 'is qualifying a lead',
+        author_research: 'is researching', writing: 'is writing a draft',
+        critic: 'is reviewing a draft', posting: 'is posting',
+        answering: 'is answering a question', idle: 'went idle',
+        offline: 'went offline', online: 'came online', error: 'hit an error',
+        paused: 'paused itself (misconfigured)',
+      };
+      const content = document.getElementById('tk-content');
+
+      function agName(id) { return NAMES[id] || id || 'An agent'; }
+
+      function narrate(e) {
+        const name = agName(e.agent_id);
+        const color = COLORS[e.agent_id] || '#ffce5c';
+        let phrase;
+        if (e.event_type === 'lifecycle' && e.metadata && e.metadata.event === 'first_seen') {
+          phrase = 'came on shift';
+        } else if (e.state && STATE_VERB[e.state]) {
+          phrase = STATE_VERB[e.state];
+        } else if (e.event_type === 'error') {
+          phrase = 'hit an error';
+        } else if (e.state) {
+          phrase = 'is now ' + e.state;
+        } else {
+          return null;
+        }
+        let extra = '';
+        if (e.payload && e.payload.current_action) {
+          const a = String(e.payload.current_action);
+          extra = ' (' + (a.length > 48 ? a.slice(0, 48) + '…' : a) + ')';
+        }
+        const t = fmtTime(e.timestamp);
+        return '<span class="tk-time">' + t + '</span>' +
+               '<span class="tk-ag" style="color:' + color + '">' + agName(e.agent_id) + '</span> ' +
+               escapeHtml(phrase + extra);
+      }
+
+      function fmtTime(ts) {
+        try { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+        catch (e) { return ''; }
+      }
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+      }
+
+      let lastHtml = '';
+      function refresh() {
+        fetch('/api/secretary/history?limit=18')
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            const events = (data && data.events) || [];
+            const parts = [];
+            for (const e of events) { const s = narrate(e); if (s) parts.push(s); }
+            if (!parts.length) {
+              setContent('<span class="tk-time">--</span>No agent activity recorded yet. The feed updates as agents work.');
+              return;
+            }
+            setContent(parts.join('<span class="tk-sep">•</span>'));
+          })
+          .catch(() => setContent('Live feed unavailable (is the server running?).'));
+      }
+
+      function setContent(html) {
+        if (html === lastHtml) return;       // avoid restarting the scroll if nothing changed
+        lastHtml = html;
+        content.innerHTML = html;
+        // Duration proportional to content length so long feeds scroll readably.
+        const secs = Math.max(24, Math.round(content.scrollWidth / 55));
+        content.style.animationDuration = secs + 's';
+      }
+
+      refresh();
+      setInterval(refresh, 6000);
+    })();
   </script>
 
 </body>

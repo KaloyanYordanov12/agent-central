@@ -79,3 +79,15 @@ made; all server runs below use ANTHROPIC_API_KEY unset so the analyst pauses
 All server runs use ANTHROPIC_API_KEY unset, so the analyst pauses (F4) and the
 office is driven purely by reads of existing activity-log / jobs data over the WS.
 
+### D1 live activity ticker (shipped)
+
+A fixed bottom news-crawl (`#activity-ticker`) with a pulsing red LIVE badge.
+A self-contained script polls `/api/secretary/history?limit=18` every 6s and
+narrates each real event into a factual, color-coded line (agent name in its
+colour + verb + timestamp), e.g. "Deal Hunter went offline", "Job Analyst paused
+itself (misconfigured)", "Job Scout started scanning". CSS marquee scroll, pauses
+on hover, only restarts when the text actually changes. Read-only; no backend
+change, so all backend tests stay green (root-serves test passes). Verified: the
+ticker shows the real current events. Screenshots: `d1-ticker.png` (in context),
+`d1-ticker-zoom.png` (legible crop).
+
