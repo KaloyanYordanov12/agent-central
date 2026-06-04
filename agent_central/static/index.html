@@ -184,38 +184,42 @@
       opacity: 0.5;
     }
 
-    /* Secretary popup (Step 4) — floating tabbed console for activity Q&A.
-       Parchment body + navy header, matching the existing palette. */
+    /* DATA MODALS (Secretary / Job Scout / Job Analyst / Dashboard): the dark
+       "console" tier of the deliberate two-tier popup system. Matches the
+       always-on HUD, ticker, funnel and cost chip. The warm parchment .popup
+       tier (below) is reserved for in-world flavor and character lore. */
     .secretary-popup { position: fixed; inset: 0; z-index: 2000; }
     .secretary-popup.hidden { display: none; }
-    .secretary-popup-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.3); }
+    .secretary-popup-backdrop { position: absolute; inset: 0; background: rgba(3, 5, 9, 0.55); }
     .secretary-popup-content {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 660px; max-width: 92vw; height: 560px; max-height: 88vh;
+      width: 680px; max-width: 92vw; height: 560px; max-height: 88vh;
       display: flex; flex-direction: column;
-      background: #f4e3b8; border: 3px solid #5a3e1f; border-radius: 4px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-      font-family: 'JetBrains Mono', monospace; color: #3a2817; overflow: hidden;
+      background: #0e1118; border: 1px solid rgba(255, 176, 0, 0.45); border-radius: 10px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+      font-family: 'JetBrains Mono', monospace; color: #f4f0e0; overflow: hidden;
     }
+    .secretary-popup-content a { color: #5fd0ff; }
     .secretary-popup-header {
       display: flex; align-items: center; justify-content: space-between;
-      background: #243845; color: #f4f0e0; padding: 10px 14px;
+      background: #11151d; color: #ffd27a; padding: 11px 15px;
+      border-bottom: 1px solid rgba(255, 176, 0, 0.25);
     }
-    .secretary-popup-header h2 { font-size: 15px; font-weight: 700; letter-spacing: 1px; margin: 0; }
+    .secretary-popup-header h2 { font-size: 14px; font-weight: 700; letter-spacing: 2px; margin: 0; }
     .secretary-popup-close {
-      background: #d9c489; border: 2px solid #1a2935; color: #1a2935;
+      background: transparent; border: 1px solid rgba(255, 176, 0, 0.4); color: #ffce5c;
       width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
       font-size: 15px; font-weight: 700; line-height: 1; font-family: inherit;
     }
-    .secretary-popup-close:hover { background: #a02828; color: #f4e3b8; }
-    .secretary-popup-tabs { display: flex; background: #ecd9a0; border-bottom: 2px solid #5a3e1f; }
+    .secretary-popup-close:hover { background: #a02828; color: #fff3d8; border-color: #a02828; }
+    .secretary-popup-tabs { display: flex; background: #0b0e14; border-bottom: 1px solid rgba(255, 176, 0, 0.2); }
     .secretary-popup-tabs .tab-button {
       padding: 8px 16px; background: transparent; border: none;
-      border-right: 1px solid #c9b079; cursor: pointer; font-family: inherit;
-      font-size: 12px; color: #5a3e1f; font-weight: 500;
+      border-right: 1px solid rgba(255, 176, 0, 0.12); cursor: pointer; font-family: inherit;
+      font-size: 12px; color: rgba(255, 176, 0, 0.6); font-weight: 500;
     }
     .secretary-popup-tabs .tab-button.active {
-      background: #f4e3b8; font-weight: 700; box-shadow: inset 0 -3px 0 #8b6534;
+      background: #0e1118; color: #ffd27a; font-weight: 700; box-shadow: inset 0 -2px 0 #ffb000;
     }
     .secretary-popup-body { flex: 1; min-height: 0; padding: 12px 14px; display: flex; }
     .secretary-popup-body .tab-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -223,54 +227,53 @@
     .history-filters { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
     .history-filters select {
       font-family: inherit; font-size: 11px; padding: 4px 6px;
-      background: #fff8e6; border: 1px solid #8b6534; color: #3a2817; border-radius: 2px;
+      background: #11151d; border: 1px solid rgba(255, 176, 0, 0.3); color: #f4f0e0; border-radius: 4px;
     }
     .history-list { flex: 1; overflow-y: auto; font-size: 11px; line-height: 1.5; }
-    .history-item { padding: 6px 4px; border-bottom: 1px solid rgba(139, 101, 52, 0.25); }
-    .history-item .hi-ts { color: #8b6534; }
-    .history-item .hi-agent { color: #243845; font-weight: 700; margin-left: 6px; }
-    .history-item .hi-type { color: #5a3e1f; margin-left: 6px; }
-    .history-item .sec-state { color: #a05a1f; }
-    .history-item .hi-detail { color: #6b563a; margin-top: 2px; }
+    .history-item { padding: 6px 4px; border-bottom: 1px solid rgba(255, 176, 0, 0.12); }
+    .history-item .hi-ts { color: rgba(255, 176, 0, 0.45); }
+    .history-item .hi-agent { color: #ffd27a; font-weight: 700; margin-left: 6px; }
+    .history-item .hi-type { color: rgba(244, 240, 224, 0.6); margin-left: 6px; }
+    .history-item .sec-state { color: #5fd0ff; }
+    .history-item .hi-detail { color: rgba(244, 240, 224, 0.65); margin-top: 2px; }
     .ask-history { flex: 1; overflow-y: auto; font-size: 12px; line-height: 1.5; margin-bottom: 10px; }
     .ask-qa { margin-bottom: 12px; }
-    .ask-q { font-weight: 700; color: #243845; margin-bottom: 4px; }
+    .ask-q { font-weight: 700; color: #ffd27a; margin-bottom: 4px; }
     .ask-q::before { content: "Q: "; }
-    .ask-a { color: #3a2817; white-space: pre-wrap; }
-    .ask-meta { font-size: 10px; color: #8b6534; margin-top: 4px; }
+    .ask-a { color: #f4f0e0; white-space: pre-wrap; }
+    .ask-meta { font-size: 10px; color: rgba(255, 176, 0, 0.45); margin-top: 4px; }
     .ask-sources { margin-top: 6px; font-size: 11px; }
-    .ask-sources summary { cursor: pointer; color: #5a3e1f; }
+    .ask-sources summary { cursor: pointer; color: #ffce5c; }
     .ask-sources ul { margin: 4px 0 0 0; padding-left: 18px; }
-    .ask-sources code { background: #ecd9a0; padding: 0 3px; }
+    .ask-sources code { background: #1b2230; padding: 0 3px; }
     .ask-input-row { display: flex; gap: 8px; }
     .ask-input-row input {
       flex: 1; font-family: inherit; font-size: 12px; padding: 8px;
-      background: #fff8e6; border: 1px solid #8b6534; color: #3a2817; border-radius: 2px;
+      background: #11151d; border: 1px solid rgba(255, 176, 0, 0.3); color: #f4f0e0; border-radius: 4px;
     }
     .ask-input-row button {
       font-family: inherit; font-size: 12px; font-weight: 700; padding: 8px 16px;
-      background: #243845; color: #f4f0e0; border: none; border-radius: 2px; cursor: pointer;
+      background: #ffb000; color: #1a1305; border: none; border-radius: 4px; cursor: pointer;
     }
     .ask-input-row button:disabled { opacity: 0.5; cursor: default; }
-    .sec-muted { color: #8b6534; font-style: italic; }
-    .sec-error { color: #a02828; }
-    /* Job Analyst score badges (commit 2b) */
+    .sec-muted { color: rgba(255, 176, 0, 0.55); font-style: italic; }
+    .sec-error { color: #ff8585; }
     .job-score-badge {
       display: inline-block; min-width: 24px; text-align: center;
       font-weight: 700; font-size: 11px; padding: 1px 5px; margin-right: 6px;
-      border-radius: 3px; color: #f4f0e0;
+      border-radius: 3px; color: #fff;
     }
-    /* F3 in-context notices: analyst paused + Ask-tab empty state (parchment palette) */
+    /* In-context notices inside the console modals (dark palette) */
     .ja-paused {
-      background: #f6e7c8; border: 1px solid #b8860b; color: #7a4a10;
-      padding: 6px 9px; border-radius: 4px; margin-bottom: 8px;
+      background: rgba(255, 138, 76, 0.12); border: 1px solid rgba(255, 138, 76, 0.6);
+      color: #ffce5c; padding: 6px 9px; border-radius: 4px; margin-bottom: 8px;
       font-size: 11px; line-height: 1.45;
     }
-    .ja-paused code { background: #ecd9a0; padding: 0 3px; }
-    .ask-empty { color: #6b563a; font-size: 12px; line-height: 1.6; padding: 4px 2px; }
-    .ask-empty .ae-eg { color: #243845; }
-    .ask-empty .ae-note { color: #8b6534; font-size: 11px; }
-    .ask-empty code { background: #ecd9a0; padding: 0 3px; }
+    .ja-paused code { background: #1b2230; padding: 0 3px; color: #ffd27a; }
+    .ask-empty { color: rgba(244, 240, 224, 0.7); font-size: 12px; line-height: 1.6; padding: 4px 2px; }
+    .ask-empty .ae-eg { color: #ffd27a; }
+    .ask-empty .ae-note { color: rgba(255, 176, 0, 0.5); font-size: 11px; }
+    .ask-empty code { background: #1b2230; padding: 0 3px; color: #ffd27a; }
     .job-score-high { background: #2e8a3e; }   /* >= 75 */
     .job-score-mid  { background: #b8860b; }    /* 50-74 */
     .job-score-low  { background: #a02828; }    /* < 50 */

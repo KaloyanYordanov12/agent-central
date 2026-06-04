@@ -60,3 +60,16 @@ explicit positioning and a window.__freeze hook (also used by replay) for
 deterministic capture. Verified by forcing three agents onto one spot: labels
 "Deal Hunter / Job Scout / Job Analyst" stagger and stay legible.
 Screenshot: p1-labels-staggered.png.
+
+### Phase 2A: unified popup system (two-tier, cohesive)
+Resolved the two clashing popup languages into a DELIBERATE two-tier system split
+by meaning. Tier 1 "console" (dark charcoal #0e1118, amber accents, JetBrains Mono)
+now styles every data modal (Secretary, Job Scout, Job Analyst, and the upcoming
+dashboard); it matches the always-on HUD, ticker, funnel and cost chip. Tier 2
+"parchment" (the existing warm .popup) is kept only for in-world flavor objects and
+Deal Hunter's lore. This was a CSS-only change to the .secretary-popup family and
+its inner content (history items, ask panel, score badges, paused/empty notices),
+recolored to the dark palette; the parchment .popup tier was left untouched. The
+split is intentional and obvious: dark = real telemetry, parchment = playful lore.
+Screenshots: f2a-secretary.png, f2a-analyst.png (dark console), f2a-flavor.png,
+f2a-dealhunter.png (parchment).
