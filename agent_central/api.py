@@ -199,7 +199,12 @@ class JobAnalystTask:
             logger.info("JobAnalystTask stopped")
 
     def _pause(self, reason: str):
-        """Stop future passes and surface why. Logged exactly once."""
+        """Stop future passes and surface why. Logged exactly once.
+
+        Logged as a 'state_change' (not 'lifecycle') so it becomes the agent's
+        current live state: the office and the status HUD then show "paused"
+        instead of a misleading "idle" while the analyst is misconfigured.
+        """
         if self.paused:
             return
         self.paused = True
@@ -207,7 +212,7 @@ class JobAnalystTask:
         logger.error(f"[job_analyst] paused (no more API calls): {reason}")
         try:
             from agent_central import activity_log
-            activity_log.log_event("job_analyst", "lifecycle", state="paused",
+            activity_log.log_event("job_analyst", "state_change", state="paused",
                                    metadata={"reason": reason})
         except Exception:
             logger.exception("failed to log analyst pause event")

@@ -88,6 +88,19 @@ colour + verb + timestamp), e.g. "Deal Hunter went offline", "Job Analyst paused
 itself (misconfigured)", "Job Scout started scanning". CSS marquee scroll, pauses
 on hover, only restarts when the text actually changes. Read-only; no backend
 change, so all backend tests stay green (root-serves test passes). Verified: the
-ticker shows the real current events. Screenshots: `d1-ticker.png` (in context),
-`d1-ticker-zoom.png` (legible crop).
+ticker shows the real current events. Screenshot: `d1-ticker-zoom.png`.
+
+### A3 always-on live status HUD (shipped)
+
+A fixed top-left panel ("Agents - live") with one row per agent: a colored status
+dot, the agent name in its colour, a human-readable state, the current action
+(when working), and "updated Ns ago". It reads `window.AGENT_LIVE` (the same live
+WS state that drives the office; exposed with a one-line alias) and re-renders
+every second, tracking state-change times locally for the "ago" label.
+
+Honesty fix folded in: the analyst's F4 pause is now logged as a `state_change`
+(was `lifecycle`, which `get_current_state` excludes), so the HUD and office show
+"Paused (misconfigured)" instead of a misleading "Idle". Verified live: HUD shows
+Deal Hunter Offline, Job Scout Idle, Job Analyst Paused (misconfigured), Secretary
+Idle. Full suite 101 passed. Screenshot: `a3-hud-zoom.png`.
 

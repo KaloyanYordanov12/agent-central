@@ -292,6 +292,36 @@
     .tk-ag { font-weight: 700; }
     .tk-time { color: rgba(255,176,0,0.45); margin-right: 5px; }
     @keyframes tk-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+
+    /* A3 always-on live status HUD — one row per agent, driven by live WS state */
+    .status-hud {
+      position: fixed; top: 14px; left: 14px; z-index: 850; width: 232px;
+      background: rgba(10, 12, 18, 0.9); border: 1px solid rgba(255,176,0,0.3);
+      border-radius: 6px; padding: 8px 10px 9px;
+      font-family: 'JetBrains Mono', monospace; color: #ffce5c;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    .status-hud h3 {
+      font-size: 10px; letter-spacing: 2px; color: rgba(255,176,0,0.6);
+      font-weight: 700; margin: 0 0 7px; text-transform: uppercase;
+    }
+    .sh-row { display: flex; align-items: flex-start; gap: 7px; padding: 4px 0;
+      border-top: 1px solid rgba(255,176,0,0.12); }
+    .sh-row:first-of-type { border-top: none; }
+    .sh-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; margin-top: 4px;
+      box-shadow: 0 0 5px currentColor; }
+    .sh-main { flex: 1; min-width: 0; }
+    .sh-name { font-size: 12px; font-weight: 700; line-height: 1.2; }
+    .sh-state { font-size: 11px; color: #f4f0e0; line-height: 1.3; }
+    .sh-action { font-size: 10px; color: rgba(244,240,224,0.55);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sh-ago { flex: none; font-size: 9.5px; color: rgba(255,176,0,0.4); margin-top: 4px; }
+    .sh-dot.s-active { background: #2bd66f; color: #2bd66f; }
+    .sh-dot.s-idle   { background: #ffce5c; color: #ffce5c; }
+    .sh-dot.s-offline{ background: #6b7280; color: #6b7280; box-shadow: none; }
+    .sh-dot.s-error  { background: #ff3030; color: #ff3030; }
+    .sh-dot.s-paused { background: #ff8a4c; color: #ff8a4c; }
+    .sh-dot.s-wait   { background: #3a3f4b; color: #3a3f4b; box-shadow: none; }
   </style>
 </head>
 <body>
@@ -315,6 +345,12 @@
   <div class="popup" id="popup" style="display: none;">
     <button class="popup-close" id="popup-close">×</button>
     <div class="popup-content" id="popup-content"></div>
+  </div>
+
+  <!-- A3 always-on live status HUD: one row per agent, driven by live WS state -->
+  <div class="status-hud" id="status-hud">
+    <h3>Agents · live</h3>
+    <div id="sh-rows"></div>
   </div>
 
   <!-- D1 live activity ticker: real events from the activity log, newest first -->
@@ -780,6 +816,7 @@
     }
     // ---- interactivity: agents, flavor objects, control stats ----
     const AGENT_LIVE = {};                                  // latest {state,action} per agent from WS
+    window.AGENT_LIVE = AGENT_LIVE;                          // exposed for the live-status HUD (A3)
     const POPUP_FN = { job_scout:'openJobScoutPopup', job_analyst:'openJobAnalystPopup', secretary:'openSecretaryPopup' };
     function showInfo(title, body, cx, cy){
       const POP=document.getElementById('popup'), POPC=document.getElementById('popup-content');
@@ -952,6 +989,77 @@
 
       refresh();
       setInterval(refresh, 6000);
+    })();
+  </script>
+
+  <script>
+    // ===================================================================
+    // A3 ALWAYS-ON LIVE STATUS HUD — one row per agent from window.AGENT_LIVE
+    // (the same live WS state that drives the office). Shows a status dot, a
+    // human-readable state, the current action, and "updated Ns ago".
+    // ===================================================================
+    (function () {
+      "use strict";
+      const AGENTS = [
+        { id: 'deal_hunter', name: 'Deal Hunter', col: '#ffce5c' },
+        { id: 'job_scout',   name: 'Job Scout',   col: '#5fd0ff' },
+        { id: 'job_analyst', name: 'Job Analyst', col: '#ff8a72' },
+        { id: 'secretary',   name: 'Secretary',   col: '#c79bff' },
+      ];
+      const STATE_LABEL = {
+        scanning: 'Scanning', qualifying: 'Qualifying a lead',
+        author_research: 'Researching', writing: 'Writing a draft',
+        critic: 'Reviewing a draft', posting: 'Posting',
+        answering: 'Answering', idle: 'Idle', offline: 'Offline',
+        online: 'Online', error: 'Error', paused: 'Paused (misconfigured)',
+      };
+      const ACTIVE = new Set(['scanning', 'qualifying', 'author_research', 'writing',
+                              'critic', 'posting', 'answering', 'online']);
+      function dotClass(state) {
+        if (!state) return 's-wait';
+        if (state === 'offline') return 's-offline';
+        if (state === 'error') return 's-error';
+        if (state === 'paused') return 's-paused';
+        if (state === 'idle') return 's-idle';
+        if (ACTIVE.has(state)) return 's-active';
+        return 's-idle';
+      }
+      const seenState = {}, changedAt = {};
+      const now = () => Date.now();
+      function agoText(id) {
+        if (!changedAt[id]) return '';
+        const s = Math.floor((now() - changedAt[id]) / 1000);
+        if (s < 60) return s + 's ago';
+        const m = Math.floor(s / 60);
+        return m < 60 ? m + 'm ago' : Math.floor(m / 60) + 'h ago';
+      }
+      function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+
+      const rowsEl = document.getElementById('sh-rows');
+      function render() {
+        const live = window.AGENT_LIVE || {};
+        const html = AGENTS.map((a) => {
+          const s = live[a.id] || {};
+          const state = s.state || null;
+          if (state && seenState[a.id] !== state) { seenState[a.id] = state; changedAt[a.id] = now(); }
+          const label = state ? (STATE_LABEL[state] || state) : 'Waiting for data';
+          const action = (state && state !== 'idle' && state !== 'offline' && s.action) ? esc(String(s.action)) : '';
+          return (
+            '<div class="sh-row">' +
+            '<span class="sh-dot ' + dotClass(state) + '"></span>' +
+            '<div class="sh-main">' +
+            '<div class="sh-name" style="color:' + a.col + '">' + a.name + '</div>' +
+            '<div class="sh-state">' + esc(label) + '</div>' +
+            (action ? '<div class="sh-action">' + action + '</div>' : '') +
+            '</div>' +
+            '<span class="sh-ago">' + (state ? agoText(a.id) : '') + '</span>' +
+            '</div>'
+          );
+        }).join('');
+        rowsEl.innerHTML = html;
+      }
+      render();
+      setInterval(render, 1000);
     })();
   </script>
 
