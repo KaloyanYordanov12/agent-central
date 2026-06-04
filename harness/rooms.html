@@ -1,0 +1,180 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Function rooms - real art (blockout-framed)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#11131a; color:#cfd2dc; font-family:'Consolas','JetBrains Mono',monospace; padding:18px 24px; }
+  h1 { font-size:15px; color:#ffb060; margin-bottom:4px; }
+  p.sub { font-size:12px; color:#8b92a4; margin-bottom:14px; max-width:980px; }
+  #stage { background:#0c0d12; border:1px solid #2a2e3a; }
+</style>
+</head>
+<body>
+  <h1>FUNCTION ROOMS - real art inside the locked blockout frame</h1>
+  <p class="sub">Blockout layout is the authority: one solid building, every room fully bounded by dark beams on all 4 sides, LOUNGE base / work middle / CONTROL top, solid stepped staircases zigzagging LOUNGE -> CONTROL. Real themed pack art dropped inside each framed box. Matched backdrops, 6x.</p>
+  <canvas id="stage"></canvas>
+
+<script>
+const S = 6;
+const NW = 360, NH = 348;                 // blockout native canvas
+const B = 3;                              // beam frame thickness around every room
+const WALL_BG = '#cd683d', FLOOR_BG = '#e6904e', BEAM = '#3a281c', BEAM_HI = '#5a4030';
+const ASSET = '../agent_central/static/assets/pixelspaces/';
+const SRC = {
+  wall:'walls/wall_warm.png', floor:'walls/floor_warm.png',
+  desk:'furniture/Drawerdesk.png', chair:'furniture/Officechair_blue.png',
+  monitor:'objects/Monitor.png', monitorS:'objects/Monitor_small.png', pc:'objects/PC.png', laptop:'objects/Laptop.png',
+  lamp:'objects/Desk_lamp.png',
+  shelf:'furniture/Bookshelf_1.png', shelf2:'furniture/Bookshelf_2.png', shelfSm:'furniture/Bookshelf_small.png',
+  shelfL:'furniture/Shelf_large.png', shelfM:'furniture/Shelf_medium.png',
+  booksO:'objects/Books_outside_1.png', booksO2:'objects/Books_outside_2.png',
+  booksI:'objects/Books_inside_1.png', booksI2:'objects/Books_inside_2.png',
+  clip:'objects/Clipboard_wall.png', clip2:'objects/Clipboard_wall_2.png',
+  clip3:'objects/Clipboard_wall_3.png', clip4:'objects/Clipboard_wall_4.png',
+  couchR:'furniture/Couch_large_red.png', couchS:'furniture/Couch_small_red.png',
+  couchSredS:'furniture/Couch_small_red_side.png', couchSgreyS:'furniture/Couch_small_grey_side.png',
+  table1:'furniture/Coffee_table_1.png', table2:'furniture/Coffee_table_2.png', stool:'furniture/Stool_red.png',
+  aquarium:'objects/Aquarium.png', radio:'objects/Radio.png',
+  fern:'objects/Flora_fern.png', bush:'objects/Flora_bush.png', snake:'objects/Flora_snake.png', pot:'objects/Flowerpot_medium_red.png',
+  poster5:'objects/Poster_5.png', poster6:'objects/Poster_6.png', poster7:'objects/Poster_7.png', clock:'objects/Clock_1_red.png',
+  agent1:'npc/agent1.png',
+};
+const IMG = {};
+let pending = Object.keys(SRC).length;
+for (const k in SRC) { const im=new Image(); im.onload=()=>{ if(--pending===0) render(); }; im.onerror=()=>console.error('fail',SRC[k]); im.src=ASSET+SRC[k]; IMG[k]=im; }
+
+// OUTER boxes are the LOCKED blockout positions. drawRoom() insets each by B so a
+// complete dark beam frames every room on all 4 sides. item dx/dy are relative to
+// the INNER top-left. 'F' = horizontally flipped. Stair corners kept furniture-free.
+// Item dx/dy are top-left of the 2x-scaled sprite, inside the inner box. Bottoms
+// land on the floor; nothing crosses a frame or a reserved stair corner.
+const ROOMS = {
+  CONTROL: { x:70, y:6, w:220, h:64, wall:36, items: [
+    // chunky wall of screens (two rows, mission control)
+    ['monitor',4,2],['monitor',34,2],['monitor',64,2],['monitor',94,2],['monitor',124,2],['monitor',154,2],['monitor',184,2],
+    ['monitor',4,20],['monitor',34,20],['monitor',64,20],['monitor',94,20],['monitor',124,20],['monitor',154,20],['monitor',184,20],
+    // operator stations facing the screens
+    ['desk',8,44],['chair',20,36],['laptop',30,30],
+    ['desk',80,44],['chair',92,36],['pc',104,30],
+    ['desk',150,44],['chair',162,36],['laptop',172,30],
+    ['pot',196,52],
+  ]},
+  THINKING: { x:0, y:70, w:175, h:128, wall:72, items: [
+    // big boards mounted high, plenty of air below = space to think
+    ['poster5',8,12],['clip',36,12],['clip2',70,12],['clip3',104,12],['poster6',138,12],
+    ['shelfL',40,50],['booksO',48,42],
+    // a seating cluster on the floor
+    ['chair',50,100],['chair',78,100],['table1',60,108],['stool',100,110],
+    ['fern',8,102],['bush',130,106],['pot',30,116],['snake',146,104],
+  ]},
+  LIBRARY: { x:175, y:70, w:185, h:64, wall:6, items: [
+    // wall-to-wall floor-to-ceiling shelving (stair lands in the left corner -> kept clear)
+    ['shelf',60,12],['shelf2',90,12],['shelf',120,12],['shelf2',150,12],
+    ['booksO',72,50],['stool',104,46],['booksO2',136,50],
+  ]},
+  COMMS: { x:175, y:134, w:185, h:64, wall:28, items: [
+    // dispatch boards + desk + radio (stair lands in the right corner -> kept clear)
+    ['clip3',6,2],['clip4',38,2],['clip3',70,2],['clock',98,4],
+    ['desk',8,44],['chair',22,36],['radio',30,30],['booksO',66,50],['booksO2',6,52],
+    ['fern',92,38],['pot',70,52],
+  ]},
+  BROWSE: { x:0, y:198, w:250, h:64, wall:24, items: [
+    // computer lab: posters on the wall + a row of chunky terminals
+    // (stair lands in the left corner -> kept clear; furniture starts past x66)
+    ['poster6',80,0],['clock',130,2],['poster7',190,0],
+    // STATION 1 -> one STATIC seated agent, working. Layer: chair, agent, desk-front
+    // (occludes legs), lit monitor (beside it so the agent reads), status bubble.
+    ['chair',84,36],['AGENT',57,6],['desk',72,44],['monitor',102,28],['LIT',104,30],['BUBBLE',101,4],
+    ['desk',130,44],['chair',142,36],['monitor',140,28],['laptop',168,30],
+    ['desk',186,44],['chair',198,36],['monitor',196,28],['pc',224,30],
+  ]},
+  WRITING: { x:250, y:198, w:110, h:64, wall:24, items: [
+    ['poster7',60,0],['shelfM',6,8],['booksI',8,2],
+    ['desk',10,44],['chair',24,36],['lamp',40,28],['booksO',62,50],
+    ['fern',84,38],['pot',66,52],
+  ]},
+  LOUNGE: { x:0, y:262, w:360, h:74, wall:22, items: [
+    // widest base, two big seating pockets (stair lands in the right corner -> kept clear; furniture in x0-294)
+    ['poster5',12,0],['poster6',70,0],['poster7',130,0],['clock',190,2],['poster6',240,0],
+    ['fern',2,48],['couchSredS',22,46,'F'],['table1',52,54],['couchSgreyS',82,46],['aquarium',112,44],['stool',112,56],['bush',138,52],
+    ['couchR',170,42],['table2',234,54],['couchSgreyS',266,46],
+  ]},
+};
+
+// LOCKED blockout staircases: solid stepped flights, each spanning one floor-to-floor
+// band, zigzagging so a climb traces LOUNGE -> BROWSE -> THINKING <->(door) COMMS -> LIBRARY -> CONTROL.
+const STAIRS = [
+  [294, 262, 60, 74, 'L'],   // LOUNGE  -> BROWSE/WRITING floor
+  [  6, 198, 60, 64, 'R'],   // BROWSE  -> THINKING floor
+  [294, 134, 60, 64, 'L'],   // COMMS   -> LIBRARY floor
+  [178,  70, 60, 64, 'R'],   // LIBRARY -> CONTROL floor
+];
+const DOORS = [ [292,262],[66,198],[175,198],[292,134],[250,262],[262,70] ];
+
+function tile(ctx, img, x, y, w, h) {
+  ctx.save(); ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();
+  for (let ty=y; ty<y+h; ty+=img.height) for (let tx=x; tx<x+w; tx+=img.width) ctx.drawImage(img,tx,ty);
+  ctx.restore();
+}
+function drawRoom(ctx, def) {
+  const {x,y,w,h,wall,items} = def;
+  const ix=x+B, iy=y+B, iw=w-2*B, ih=h-2*B;
+  ctx.save(); ctx.beginPath(); ctx.rect(ix,iy,iw,ih); ctx.clip();   // keep contents off the beams
+  ctx.fillStyle = WALL_BG;  ctx.fillRect(ix,iy,iw,wall); tile(ctx,IMG.wall,ix,iy,iw,wall);
+  ctx.fillStyle = FLOOR_BG; ctx.fillRect(ix,iy+wall,iw,ih-wall); tile(ctx,IMG.floor,ix,iy+wall,iw,ih-wall);
+  for (const [k,dx,dy,fl] of items) {            // every item drawn at crisp 2x native
+    if (k==='AGENT') { ctx.drawImage(IMG.agent1, 0,32,32,32, ix+dx, iy+dy, 64,64); continue; }  // idle row1 col0 @2x
+    if (k==='LIT') {                              // light up this station's screen
+      ctx.fillStyle='#0b2a2a'; ctx.fillRect(ix+dx,iy+dy,20,10);
+      ctx.fillStyle='#3fe3cb'; ctx.fillRect(ix+dx+1,iy+dy+1,18,8);
+      ctx.fillStyle='#c9fff4'; ctx.fillRect(ix+dx+2,iy+dy+2,7,2);
+      continue;
+    }
+    if (k==='BUBBLE') {                           // "working" status bubble, tail points down-left to the head
+      const bx=ix+dx, by=iy+dy;
+      ctx.fillStyle='#11141c'; ctx.fillRect(bx-1,by-1,20,13);
+      ctx.fillStyle='#11141c'; ctx.fillRect(bx-3,by+13,5,5);            // tail outline
+      ctx.fillStyle='#f4f6fb'; ctx.fillRect(bx,by,18,11);              // bubble body
+      ctx.fillStyle='#f4f6fb'; ctx.fillRect(bx-2,by+12,5,3); ctx.fillRect(bx,by+11,3,2);  // tail
+      ctx.fillStyle='#2bd66f'; ctx.fillRect(bx+3,by+4,3,3);            // green = working
+      ctx.fillStyle='#9aa2b4'; ctx.fillRect(bx+8,by+5,2,2); ctx.fillRect(bx+12,by+5,2,2);
+      continue;
+    }
+    const im = IMG[k], sw = im.width*2, sh = im.height*2;
+    if (fl==='F') { ctx.save(); ctx.translate(ix+dx+sw, iy+dy); ctx.scale(-1,1); ctx.drawImage(im,0,0,sw,sh); ctx.restore(); }
+    else ctx.drawImage(im, ix+dx, iy+dy, sw, sh);
+  }
+  ctx.restore();
+}
+// Solid stepped staircase (blockout style): columns rising across the band, base on
+// the lower floor, landing on the upper floor.
+function staircase(ctx, x,y,w,h,dir) {
+  const n=8, tw=w/n, th=h/n;
+  for (let i=0;i<n;i++){ const colH=(i+1)*th, cx=(dir==='R')?x+i*tw:x+(n-1-i)*tw, cy=y+h-colH;
+    ctx.fillStyle='#878b95'; ctx.fillRect(cx,cy,tw,colH);
+    ctx.fillStyle='#c6cad4'; ctx.fillRect(cx,cy,tw,1.2);                 // tread
+    ctx.fillStyle='#5c606a'; ctx.fillRect((dir==='R')?cx+tw-0.6:cx, cy, 0.8, colH); }  // riser shade
+  ctx.fillStyle='#aeb2bc';
+  const landX=(dir==='R')?x+w-tw*2:x;
+  ctx.fillRect(landX, y-1, tw*2, 2);          // top landing on upper floor
+  ctx.fillRect(x, y+h-1, w, 2);               // base on lower floor
+}
+
+function render() {
+  const off = document.createElement('canvas'); off.width=NW; off.height=NH;
+  const octx = off.getContext('2d'); octx.imageSmoothingEnabled=false;
+
+  octx.fillStyle = BEAM; octx.fillRect(0,0,NW,NH);            // beams everywhere; rooms inset -> framed on all sides
+  for (const k in ROOMS) drawRoom(octx, ROOMS[k]);
+  for (const s of STAIRS) staircase(octx, ...s);             // stepped flights on top, in their reserved corners
+  for (const [x,y] of DOORS) { octx.fillStyle='#14141a'; octx.fillRect(x-2,y-12,4,12); }
+
+  const c = document.getElementById('stage'); c.width=NW*S; c.height=NH*S;
+  const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(off, 0,0,NW,NH, 0,0,NW*S,NH*S);
+}
+</script>
+</body>
+</html>

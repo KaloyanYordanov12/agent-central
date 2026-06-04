@@ -7,7 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
   <style>
     :root {
       --bg-deep: #050505;
@@ -52,7 +51,7 @@
       bottom: 0;
       display: flex;
       align-items: center;
-      justify-content: flex-start;
+      justify-content: center;
       background-image: url('/static/assets/backgrounds/world-bg-v2.png');
       background-size: cover;
       background-position: center;
@@ -60,70 +59,13 @@
       background-color: #7ec0e8; /* fallback while image loads */
     }
 
-    /* Rixitic building positioned over the fountain/lawn (center-left).
-       The image's own corporate building (right side) becomes contextual scenery. */
+    /* The pixelspaces building canvas IS the building (it carries its own dark
+       beam frame), so no CSS wall/roof chrome here. Centered horizontally over
+       the world backdrop by the flex container; full "set in the world" polish
+       comes later. */
     .building {
       position: relative;
       display: inline-block;
-      margin-left: 18vw;
-      border: 12px solid #8a8a8a;          /* lighter walls — was #6e6e6e */
-      border-top: 22px solid #6a6a6a;      /* lighter roof base — was #4a4a4a */
-      background:
-        /* Side window strips (left + right) */
-        linear-gradient(to right,
-          transparent 0px, transparent 12px,
-          #3a4a5c 12px, #3a4a5c 32px,
-          transparent 32px, transparent calc(100% - 32px),
-          #3a4a5c calc(100% - 32px), #3a4a5c calc(100% - 12px),
-          transparent calc(100% - 12px), transparent 100%
-        ),
-        /* Subtle column gradient — replaces hard alternating panels */
-        repeating-linear-gradient(
-          to right,
-          #7a7a7a 0px,
-          #7a7a7a 60px,
-          #888888 60px,
-          #888888 120px
-        );
-      box-shadow:
-        0 8px 30px rgba(0, 0, 0, 0.6),
-        inset 8px 0 0 rgba(255, 255, 255, 0.08),
-        inset -8px 0 0 rgba(0, 0, 0, 0.12),
-        inset 0 0 80px rgba(0, 0, 0, 0.2);
-    }
-
-    /* Roof — layered detail: thin highlight strip at top */
-    .building::before {
-      content: '';
-      position: absolute;
-      top: -22px;
-      left: -12px;
-      right: -12px;
-      height: 22px;
-      background:
-        linear-gradient(to bottom,
-          #8a8a8a 0px,
-          #8a8a8a 2px,
-          #5a5a5a 2px,
-          #5a5a5a 100%
-        );
-      z-index: 1;
-      pointer-events: none;
-    }
-
-    /* Roof — HVAC ledge silhouette poking up at center */
-    .building::after {
-      content: '';
-      position: absolute;
-      top: -26px;
-      left: 30%;
-      width: 40%;
-      height: 6px;
-      background: linear-gradient(to bottom, #6a6a6a 0%, #4a4a4a 100%);
-      border-radius: 2px 2px 0 0;
-      z-index: 2;
-      pointer-events: none;
-      box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.3);
     }
 
     .building-sign {
@@ -155,110 +97,6 @@
     }
     .building-sign::before { left: 20%; }
     .building-sign::after  { right: 20%; }
-
-    /* Zone LED status indicators — one small lit dot above where the character
-       stands in each zone. Only the active zone's LED lights up. Coords are
-       display space: native (x,y) from ZONE_MAP * 1.5, top offset ~50px up to
-       sit above the character's head; left centered (-4) for the 8px dot. */
-    .zone-led {
-      position: absolute;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 5;
-      /* Default (idle): dim, no glow */
-      background: #2a3340;
-      border: 1px solid #1a1f28;
-      box-shadow: none;
-      transition: background 0.3s ease, box-shadow 0.3s ease;
-    }
-
-    /* Positions anchored to the character's standing point in each zone (ZONE_MAP),
-       not a clickable element — the character stands at ZONE_MAP (x,y), which does
-       not align with the clickable hitboxes. left = zone.x*1.5 - 4 (centered on
-       character), top = zone.y*1.5 - 50 (above his head). */
-    #zone-led-operations    { left: 131px; top: 128px; }  /* character at (90, 130) upper; raised above the dock label */
-    #zone-led-communications { left: 341px; top: 145px; } /* character at (230, 130) upper */
-    #zone-led-writingDesk   { left: 626px; top: 145px; }  /* character at (420, 130) upper */
-    #zone-led-lounge        { left: 191px; top: 385px; }  /* character at (130, 290) lower */
-    #zone-led-research      { left: 761px; top: 385px; }  /* character at (510, 290) lower */
-
-    /* Active states */
-    .zone-led.state-scanning,
-    .zone-led.state-operations {
-      background: #5cb6ff;
-      border-color: #7cc8ff;
-      box-shadow:
-        0 0 4px 1px rgba(92, 182, 255, 0.9),
-        0 0 10px 3px rgba(92, 182, 255, 0.5);
-      animation: led-pulse-slow 2.5s ease-in-out infinite;
-    }
-
-    .zone-led.state-qualifying {
-      background: #ffb000;
-      border-color: #ffd060;
-      box-shadow:
-        0 0 4px 1px rgba(255, 176, 0, 0.9),
-        0 0 10px 3px rgba(255, 176, 0, 0.5);
-      animation: led-pulse-medium 1.8s ease-in-out infinite;
-    }
-
-    .zone-led.state-researching,
-    .zone-led.state-research,
-    .zone-led.state-author_research {
-      background: #4caf50;
-      border-color: #80e090;
-      box-shadow:
-        0 0 4px 1px rgba(76, 175, 80, 0.9),
-        0 0 10px 3px rgba(76, 175, 80, 0.5);
-      /* steady, no pulse */
-    }
-
-    .zone-led.state-writing {
-      background: #d050ff;
-      border-color: #e088ff;
-      box-shadow:
-        0 0 4px 1px rgba(208, 80, 255, 0.9),
-        0 0 10px 3px rgba(208, 80, 255, 0.5);
-      animation: led-pulse-fast 1s ease-in-out infinite;
-    }
-
-    .zone-led.state-posting {
-      background: #00e5ff;
-      border-color: #80f5ff;
-      box-shadow:
-        0 0 4px 1px rgba(0, 229, 255, 1),
-        0 0 10px 3px rgba(0, 229, 255, 0.6);
-      animation: led-flash 0.5s steps(2, end) infinite;
-    }
-
-    .zone-led.state-critic {
-      background: #fff200;
-      border-color: #fff880;
-      box-shadow:
-        0 0 4px 1px rgba(255, 242, 0, 0.9),
-        0 0 10px 3px rgba(255, 242, 0, 0.5);
-      animation: led-pulse-medium 1.8s ease-in-out infinite;
-    }
-
-    /* Animations — sharper pulses to feel like actual LEDs */
-    @keyframes led-pulse-slow {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-    @keyframes led-pulse-medium {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.6; }
-    }
-    @keyframes led-pulse-fast {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.65; }
-    }
-    @keyframes led-flash {
-      0%, 49% { opacity: 1; }
-      50%, 100% { opacity: 0.3; }
-    }
 
     #game-container {
       line-height: 0;
@@ -434,13 +272,6 @@
       <div class="building-sign">AGENT CENTRAL</div>
       <div id="game-container"></div>
 
-      <!-- Zone LEDs — one per zone the character walks to (F.2c-zone-leds) -->
-      <div class="zone-led" id="zone-led-operations"></div>
-      <div class="zone-led" id="zone-led-communications"></div>
-      <div class="zone-led" id="zone-led-writingDesk"></div>
-      <div class="zone-led" id="zone-led-lounge"></div>
-      <div class="zone-led" id="zone-led-research"></div>
-
       <!-- Cost Today indicator (commit 2b): running LLM spend, polled every 60s -->
       <div id="cost-today-indicator"
            style="position: absolute; top: 8px; right: 8px;
@@ -578,803 +409,350 @@
   </script>
 
   <script>
-    // ============================================================
-    // ZONE MAP — five agent zones with (x, y) waypoints where the character stands.
-    // floor: 'upper' or 'lower' — controls elevator routing during cross-floor walks.
-    // Coordinates are estimates within the 656×320 native canvas; tune visually.
-    // ============================================================
-    const ZONE_MAP = {
-      operations:     { x: 90,  y: 130, floor: 'upper', label: 'OPERATIONS' },
-      communications: { x: 230, y: 130, floor: 'upper', label: 'COMMUNICATIONS' },
-      writingDesk:    { x: 420, y: 130, floor: 'upper', label: 'WRITING DESK' },
-      lounge:         { x: 130, y: 290, floor: 'lower', label: 'LOUNGE' },
-      research:       { x: 510, y: 290, floor: 'lower', label: 'RESEARCH' },
+    // ===================================================================
+    // LIVING OFFICE — pixelspaces building + 4 agents driven by LIVE backend
+    // state over /ws/status. State = destination: an agent with a real task
+    // walks to the mapped room and works; idle agents lurk and roam the whole
+    // building; offline agents dim. Encounters emerge from proximity.
+    // ===================================================================
+    const S = 2;
+    const NW = 360, NH = 348, B = 3;
+    const WALL_BG='#cd683d', FLOOR_BG='#e6904e', BEAM='#3a281c';
+    const ASSET='/static/assets/pixelspaces/';
+    const SPEED_DEFAULT = 46, STRIDE = 7, TRIGGER = 42, GREET = 1.6;
+
+    const SRC = {
+      wall:'walls/wall_warm.png', floor:'walls/floor_warm.png',
+      desk:'furniture/Drawerdesk.png', chair:'furniture/Officechair_blue.png',
+      monitor:'objects/Monitor.png', monitorS:'objects/Monitor_small.png', pc:'objects/PC.png', laptop:'objects/Laptop.png',
+      lamp:'objects/Desk_lamp.png',
+      shelf:'furniture/Bookshelf_1.png', shelf2:'furniture/Bookshelf_2.png',
+      shelfL:'furniture/Shelf_large.png', shelfM:'furniture/Shelf_medium.png',
+      booksO:'objects/Books_outside_1.png', booksO2:'objects/Books_outside_2.png', booksI:'objects/Books_inside_1.png',
+      clip:'objects/Clipboard_wall.png', clip3:'objects/Clipboard_wall_3.png', clip4:'objects/Clipboard_wall_4.png',
+      couchR:'furniture/Couch_large_red.png', couchSredS:'furniture/Couch_small_red_side.png', couchSgreyS:'furniture/Couch_small_grey_side.png',
+      table1:'furniture/Coffee_table_1.png', table2:'furniture/Coffee_table_2.png', stool:'furniture/Stool_red.png',
+      aquarium:'objects/Aquarium.png', radio:'objects/Radio.png',
+      fern:'objects/Flora_fern.png', bush:'objects/Flora_bush.png', snake:'objects/Flora_snake.png', pot:'objects/Flowerpot_medium_red.png',
+      poster5:'objects/Poster_5.png', poster6:'objects/Poster_6.png', poster7:'objects/Poster_7.png', clock:'objects/Clock_1_red.png',
+      stairs:'infrastructure/Stairs.png',
+      deal_hunter:'npc/deal_hunter.png', job_scout:'npc/job_scout.png', job_analyst:'npc/job_analyst.png', secretary:'npc/secretary.png',
     };
+    const IMG = {};
 
-    const ELEVATOR_UPPER = { x: 90, y: 130 };
-    const ELEVATOR_LOWER = { x: 90, y: 290 };
+    // ---- LOCKED building (identical to harness/agents_m3.html) ----
+    const ROOMS = {
+      CONTROL: { x:70, y:6, w:220, h:64, wall:36, items: [
+        ['monitor',4,2],['monitor',34,2],['monitor',64,2],['monitor',94,2],['monitor',124,2],['monitor',154,2],['monitor',184,2],
+        ['monitor',4,20],['monitor',34,20],['monitor',64,20],['monitor',94,20],['monitor',124,20],['monitor',154,20],['monitor',184,20],
+        ['desk',8,44],['chair',20,36],['laptop',30,30],['desk',80,44],['chair',92,36],['pc',104,30],['desk',150,44],['chair',162,36],['laptop',172,30],['pot',196,52],
+      ]},
+      THINKING: { x:0, y:70, w:175, h:128, wall:72, items: [
+        ['poster5',8,12],['clip',36,12],['clip3',70,12],['clip4',104,12],['poster6',138,12],['shelfL',40,50],['booksO',48,42],
+        ['chair',50,100],['chair',78,100],['table1',60,108],['stool',100,110],['fern',8,102],['bush',130,106],['pot',30,116],['snake',146,104],
+      ]},
+      LIBRARY: { x:175, y:70, w:185, h:64, wall:6, items: [
+        ['shelf',60,12],['shelf2',90,12],['shelf',120,12],['shelf2',150,12],['booksO',72,50],['stool',104,46],['booksO2',136,50],
+      ]},
+      COMMS: { x:175, y:134, w:185, h:64, wall:28, items: [
+        ['clip3',6,2],['clip4',38,2],['clip3',70,2],['clock',98,4],['desk',8,44],['chair',22,36],['radio',30,30],['booksO',66,50],['booksO2',6,52],['fern',92,38],['pot',70,52],
+      ]},
+      BROWSE: { x:0, y:198, w:250, h:64, wall:24, items: [
+        ['poster6',80,0],['clock',130,2],['poster7',190,0],
+        ['desk',72,44],['chair',84,36],['monitor',82,28],['pc',112,30],
+        ['desk',130,44],['chair',142,36],['monitor',140,28],['laptop',168,30],
+        ['desk',186,44],['chair',198,36],['monitor',196,28],['pc',224,30],
+      ]},
+      WRITING: { x:250, y:198, w:110, h:64, wall:24, items: [
+        ['poster7',60,0],['shelfM',6,8],['booksI',8,2],['desk',10,44],['chair',24,36],['lamp',40,28],['booksO',62,50],['fern',84,38],['pot',66,52],
+      ]},
+      LOUNGE: { x:0, y:262, w:360, h:74, wall:22, items: [
+        ['poster5',12,0],['poster6',70,0],['poster7',130,0],['clock',190,2],['poster6',240,0],
+        ['fern',2,48],['couchSredS',22,46,'F'],['table1',52,54],['couchSgreyS',82,46],['aquarium',112,44],['stool',112,56],['bush',138,52],
+        ['couchR',170,42],['table2',234,54],['couchSgreyS',266,46],
+      ]},
+    };
+    // Each box's corners are pinned to the flight's lower-start and upper-landing
+    // floor nodes so the sprite diagonal meets both floors flush (= the foot path).
+    // L: top-left=upper landing, bottom-right=lower start. R: top-right=upper, bottom-left=lower.
+    const STAIRS = [
+      [300,259,48,74,'L'],   // S1 LOUNGE(348,333) -> WRITING(300,259)
+      [14,195,46,64,'R'],    // S2 BROWSE(14,259)  -> THINKING(60,195)
+      [300,131,48,64,'L'],   // S3 COMMS(348,195)  -> LIBRARY(300,131)
+      [188,67,44,64,'R'],    // S4 LIBRARY(188,131) -> CONTROL(232,67)
+    ];
+    const DOORS = [[292,262],[66,198],[175,198],[292,134],[250,262],[262,70]];
+    function tile(ctx,img,x,y,w,h){ ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
+      for(let ty=y;ty<y+h;ty+=img.height)for(let tx=x;tx<x+w;tx+=img.width)ctx.drawImage(img,tx,ty); ctx.restore(); }
+    function drawRoom(ctx,def){ const {x,y,w,h,wall,items}=def; const ix=x+B,iy=y+B,iw=w-2*B,ih=h-2*B;
+      ctx.save();ctx.beginPath();ctx.rect(ix,iy,iw,ih);ctx.clip();
+      ctx.fillStyle=WALL_BG;ctx.fillRect(ix,iy,iw,wall);tile(ctx,IMG.wall,ix,iy,iw,wall);
+      ctx.fillStyle=FLOOR_BG;ctx.fillRect(ix,iy+wall,iw,ih-wall);tile(ctx,IMG.floor,ix,iy+wall,iw,ih-wall);
+      for(const [k,dx,dy,fl] of items){ const im=IMG[k],sw=im.width*2,sh=im.height*2;
+        if(fl==='F'){ctx.save();ctx.translate(ix+dx+sw,iy+dy);ctx.scale(-1,1);ctx.drawImage(im,0,0,sw,sh);ctx.restore();}
+        else ctx.drawImage(im,ix+dx,iy+dy,sw,sh); }
+      ctx.restore(); }
+    // Real pack staircase art (treads + risers + railing) scaled to span each
+    // floor-to-floor gap. The sprite as-drawn rises high-left -> low-right, which
+    // matches a left-rising flight (dir 'L'); flip it for right-rising flights
+    // (dir 'R') so the treads align with the agent's climb path (feet on steps).
+    function staircase(ctx,x,y,w,h,dir){ const im=IMG.stairs;
+      if(dir==='R'){ ctx.save(); ctx.translate(x+w,y); ctx.scale(-1,1); ctx.drawImage(im,0,0,w,h); ctx.restore(); }
+      else ctx.drawImage(im,x,y,w,h); }
 
-    const WALK_SPEED = 80; // native pixels per second
+    // ---- walkable graph (room floors + 4 stairs + doors) ----
+    const NODE = {
+      BROW_S2:[14,259], BR1:[93,259], BR2:[151,259], BR3:[209,259], L1DOOR:[250,259],
+      WRW:[280,259], WRIT:[300,259],
+      THIN_S2:[60,195], THIN_C:[95,195], THIN_R:[140,195], L2DOOR:[175,195],
+      CMW:[209,195], COMM_C:[240,195], COMM_S3:[348,195],
+      LIB_S4:[188,131], LIB_L:[205,131], LIB_C:[250,131], LIB_S3:[300,131],
+      CTW:[98,67], CTRL_C:[150,67], CTRL_R:[200,67], CTRL_S4:[232,67],
+      LOUNGE_FAR:[60,333], LOUNGE_W:[110,333], LOUNGE_M:[200,333], LOUNGE_E:[290,333], LOUNGE_S1:[348,333],
+    };
+    const LINKS = [
+      ['BROW_S2','BR1'],['BR1','BR2'],['BR2','BR3'],['BR3','L1DOOR'],
+      ['L1DOOR','WRW'],['WRW','WRIT'],
+      ['THIN_S2','THIN_C'],['THIN_C','THIN_R'],['THIN_R','L2DOOR'],
+      ['L2DOOR','CMW'],['CMW','COMM_C'],['COMM_C','COMM_S3'],
+      ['LIB_S4','LIB_L'],['LIB_L','LIB_C'],['LIB_C','LIB_S3'],
+      ['CTW','CTRL_C'],['CTRL_C','CTRL_R'],['CTRL_R','CTRL_S4'],
+      ['LOUNGE_FAR','LOUNGE_W'],['LOUNGE_W','LOUNGE_M'],['LOUNGE_M','LOUNGE_E'],['LOUNGE_E','LOUNGE_S1'],
+      ['LOUNGE_S1','WRIT'],['BROW_S2','THIN_S2'],['COMM_S3','LIB_S3'],['LIB_S4','CTRL_S4'],
+    ];
+    const ADJ={}; for(const id in NODE) ADJ[id]=[];
+    const d2=(a,b)=>Math.hypot(NODE[a][0]-NODE[b][0],NODE[a][1]-NODE[b][1]);
+    for(const [a,b] of LINKS){ ADJ[a].push(b); ADJ[b].push(a); }
+    const NODE_IDS = Object.keys(NODE);
+    function dijkstra(src,dst){ const D={},P={},Q=new Set(NODE_IDS);
+      for(const id in NODE)D[id]=Infinity; D[src]=0;
+      while(Q.size){ let u=null,bb=Infinity; for(const id of Q)if(D[id]<bb){bb=D[id];u=id;} if(u===null)break; Q.delete(u); if(u===dst)break;
+        for(const v of ADJ[u]){const nd=D[u]+d2(u,v); if(nd<D[v]){D[v]=nd;P[v]=u;}} }
+      const path=[]; let c=dst; while(c!==undefined){path.unshift(c); if(c===src)break; c=P[c];} return path; }
 
-    // Maps Deal Hunter pipeline states to zones for autonomous walking.
+    // ---- desk work seats (seated illusion + lit device + bubble) ----
+    const SEATS = {
+      BR1:{occ:[['BROWSE',['desk',72,44]]],  light:{type:'mon',x:105,y:229}, bubble:{x:104,y:205}},
+      BR2:{occ:[['BROWSE',['desk',130,44]]], light:{type:'mon',x:163,y:229}, bubble:{x:162,y:205}},
+      BR3:{occ:[['BROWSE',['desk',186,44]]], light:{type:'mon',x:219,y:229}, bubble:{x:218,y:205}},
+      CMW:{occ:[['COMMS',['desk',8,44]]],    light:{type:'monS',x:220,y:166}, bubble:{x:214,y:143}},
+      WRW:{occ:[['WRITING',['desk',10,44]]], light:{type:'laptop',x:296,y:231}, bubble:{x:296,y:205}},
+    };
+    // stations per function room (desk = seated illusion; stand = standing work pose)
+    const ROOM_STATIONS = {
+      BROWSE:  [{node:'BR1',type:'desk'},{node:'BR2',type:'desk'},{node:'BR3',type:'desk'}],
+      WRITING: [{node:'WRW',type:'desk'}],
+      COMMS:   [{node:'CMW',type:'desk'},{node:'COMM_C',type:'stand'}],
+      THINKING:[{node:'THIN_C',type:'stand'},{node:'THIN_R',type:'stand'}],
+      LIBRARY: [{node:'LIB_L',type:'stand'},{node:'LIB_C',type:'stand'}],
+    };
+    // CONFIRMED state -> room. Same literal 'scanning' routes Job Scout to Browse
+    // (web fetch) but Job Analyst to Thinking (LLM analysis). idle/error -> roam.
+    // STATE_TO_ZONE is the full Deal Hunter pipeline map; idle/offline are present
+    // for the frontend test contract (tests/test_status.py) but handled specially
+    // below (idle -> roam, offline -> dim), so Deal Hunter idle still lurks.
     const STATE_TO_ZONE = {
-      scanning:        'research',
-      qualifying:      'operations',
-      author_research: 'research',
-      writing:         'writingDesk',
-      critic:          'writingDesk',
-      posting:         'communications',
-      idle:            'lounge',
+      scanning:        'BROWSE',
+      qualifying:      'THINKING',
+      author_research: 'LIBRARY',
+      writing:         'WRITING',
+      critic:          'THINKING',
+      posting:         'COMMS',
+      idle:            'LOUNGE',
       offline:         null,
     };
-
-    let pendingDestination = null; // queued state changes during walks
-    let isOffline = false;
-
-    // ============================================================
-    // DEMO MODE — when enabled, keyboard inputs override WebSocket state.
-    // Toggle via ?demo=true URL param or pressing 'D' key.
-    // ============================================================
-    let demoMode = new URLSearchParams(window.location.search).get('demo') === 'true';
-
-    function updateDemoIndicator() {
-      let indicator = document.getElementById('demo-indicator');
-      if (!indicator) {
-        indicator = document.createElement('div');
-        indicator.id = 'demo-indicator';
-        indicator.style.cssText = `
-          position: fixed;
-          bottom: 12px;
-          right: 12px;
-          padding: 6px 10px;
-          background: #2d4a5c;
-          color: #f4f0e0;
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 10px;
-          letter-spacing: 1px;
-          border: 1px solid #1a3445;
-          border-radius: 2px;
-          z-index: 999;
-          pointer-events: none;
-        `;
-        document.body.appendChild(indicator);
-      }
-      indicator.textContent = demoMode ? 'DEMO MODE' : '';
-      indicator.style.display = demoMode ? 'block' : 'none';
-    }
-
-    // Wire 'D' key to toggle demo mode
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'd' || e.key === 'D') {
-        demoMode = !demoMode;
-        updateDemoIndicator();
-        console.log('Demo mode:', demoMode);
-      }
-    });
-
-    // Initial state
-    updateDemoIndicator();
-
-    function applyAgentState(scene, payload) {
-      // In demo mode, ignore WebSocket state updates entirely.
-      // Keyboard inputs are the source of truth.
-      if (demoMode) return;
-
-      const state = payload.state;
-      isOffline = (state === 'offline');
-
-      // Light the LED for the zone this state maps to (fall back to current zone).
-      const ledZone = STATE_TO_ZONE[state] || scene.currentZone;
-      setMonitorState(isOffline ? 'idle' : state, ledZone);
-
-      if (isOffline) return;
-
-      const targetZone = STATE_TO_ZONE[state];
-      if (!targetZone) return;
-      if (targetZone === scene.currentZone) return;
-
-      if (scene.isWalking) {
-        pendingDestination = targetZone;
-      } else {
-        walkToZone(scene, targetZone);
-      }
-    }
-
-    // Update zone LEDs — only the currently-active zone gets its state class.
-    // Called from both applyAgentState (WebSocket) and updateStatusText (keyboard).
-    function setMonitorState(state, currentZone) {
-      const leds = document.querySelectorAll('.zone-led');
-      leds.forEach(led => {
-        const classesToRemove = [];
-        led.classList.forEach(cls => {
-          if (cls.startsWith('state-')) classesToRemove.push(cls);
-        });
-        classesToRemove.forEach(cls => led.classList.remove(cls));
-      });
-
-      // Light only the LED for the current zone.
-      if (currentZone) {
-        const activeLED = document.getElementById('zone-led-' + currentZone);
-        if (activeLED && state && state !== 'idle') {
-          activeLED.classList.add('state-' + state);
-        }
-      }
-    }
-
-    // Maps a zone key to the agent state it implies (for keyboard-driven changes).
-    // Keys must match the actual ZONE_MAP zones (communications/writingDesk),
-    // mapped to states consistent with STATE_TO_ZONE so each zone LED lights.
-    function zoneToState(zoneKey) {
-      const map = {
-        // operations is Deal Hunter's idle dock, so being parked there reads as
-        // idle (no LED glow). Genuine work still lights the operations LED via the
-        // WebSocket path (STATE_TO_ZONE maps qualifying -> operations); real
-        // scanning lights the research LED (scanning -> research), not this one.
-        'operations': 'idle',
-        'communications': 'posting',
-        'writingDesk': 'writing',
-        'research': 'researching',
-        'lounge': 'idle',
-        // legacy aliases (not ZONE_MAP keys, kept harmlessly)
-        'qualifying': 'qualifying',
-        'writing': 'writing',
-        'posting': 'posting',
-      };
-      return map[zoneKey] || 'idle';
-    }
-
-    function consumePendingDestination(scene) {
-      if (pendingDestination && pendingDestination !== scene.currentZone) {
-        const next = pendingDestination;
-        pendingDestination = null;
-        walkToZone(scene, next);
-      }
-    }
-
-    // Drives the zone LEDs from Deal Hunter's current zone. (The old on-canvas
-    // status-overlay text was removed; the per-agent following labels + wall
-    // plaques now carry that context. Name kept so existing callers are unchanged.)
-    function updateStatusText(scene) {
-      setMonitorState(zoneToState(scene.currentZone), scene.currentZone);
-    }
-
-    function walkToZone(scene, zoneKey) {
-      if (scene.isWalking) return;
-      const target = ZONE_MAP[zoneKey];
-      if (!target) return;
-      if (zoneKey === scene.currentZone) return;
-
-      const currentZoneData = ZONE_MAP[scene.currentZone];
-      scene.isWalking = true;
-      updateStatusText(scene);
-
-      const finishAtTarget = () => {
-        scene.currentZone = zoneKey;
-        scene.isWalking = false;
-        updateStatusText(scene);
-        consumePendingDestination(scene);
-      };
-
-      if (currentZoneData.floor === target.floor) {
-        const distance = Math.abs(target.x - scene.dealHunter.x);
-        const duration = (distance / WALK_SPEED) * 1000;
-        scene.tweens.add({
-          targets: scene.dealHunter,
-          x: target.x,
-          duration: duration,
-          ease: 'Linear',
-          onComplete: finishAtTarget,
-        });
-        return;
-      }
-
-      // Cross-floor — walk to elevator on current floor, teleport, walk to target on other floor.
-      const currentElevator = currentZoneData.floor === 'upper' ? ELEVATOR_UPPER : ELEVATOR_LOWER;
-      const otherElevator   = currentZoneData.floor === 'upper' ? ELEVATOR_LOWER : ELEVATOR_UPPER;
-
-      const distanceToElevator   = Math.abs(currentElevator.x - scene.dealHunter.x);
-      const distanceFromElevator = Math.abs(target.x - otherElevator.x);
-      const durationToElevator   = (distanceToElevator   / WALK_SPEED) * 1000;
-      const durationFromElevator = (distanceFromElevator / WALK_SPEED) * 1000;
-
-      scene.tweens.add({
-        targets: scene.dealHunter,
-        x: currentElevator.x,
-        duration: durationToElevator,
-        ease: 'Linear',
-        onComplete: () => {
-          // "Use the elevator" — teleport to the other floor's matching elevator slot.
-          scene.dealHunter.x = otherElevator.x;
-          scene.dealHunter.y = otherElevator.y;
-
-          scene.tweens.add({
-            targets: scene.dealHunter,
-            x: target.x,
-            duration: durationFromElevator,
-            ease: 'Linear',
-            onComplete: finishAtTarget,
-          });
-        },
-      });
-    }
-
-    // ============================================================
-    // STATE-COUPLED WALKING for stationary agents.
-    // Job Scout / Job Analyst couple to backend state pushed over the
-    // 'agent_states' WebSocket message; Secretary gets a cosmetic wander
-    // (no scheduled state to couple to). Deal Hunter is unaffected.
-    // ============================================================
-
-    // Generic single-axis walker for a stationary sprite. Mirrors Deal Hunter's
-    // queueing: a state change mid-walk parks the next target in `pendingX`,
-    // consumed on arrival, so rapid state flips resolve cleanly without
-    // stacking tweens. Only horizontal movement (these agents never change floor).
-    function makeCoupledWalker(scene, sprite, homeX, awayX, pulseTween) {
-      const w = { isWalking: false, pendingX: null };
-
-      function arrive() {
-        w.isWalking = false;
-        const next = w.pendingX;
-        w.pendingX = null;
-        if (next !== null && Math.abs(next - sprite.x) > 1) walkTo(next);
-      }
-
-      function walkTo(x) {
-        if (Math.abs(sprite.x - x) <= 1) return;
-        if (w.isWalking) { w.pendingX = x; return; }
-        w.isWalking = true;
-        const duration = (Math.abs(x - sprite.x) / WALK_SPEED) * 1000;
-        scene.tweens.add({
-          targets: sprite, x: x, duration: duration, ease: 'Linear',
-          onComplete: arrive,
-        });
-      }
-
-      function setError(on) {
-        // Faster alpha pulse signals an errored pass; reset to calm idle pulse.
-        if (pulseTween) pulseTween.timeScale = on ? 2.5 : 1;
-      }
-
-      return {
-        // idle/error -> walk home; scanning -> walk away; unknown -> stay put.
-        setState(state) {
-          if (state === 'scanning') { setError(false); walkTo(awayX); }
-          else if (state === 'idle')  { setError(false); walkTo(homeX); }
-          else if (state === 'error') { setError(true);  walkTo(homeX); }
-          // any other state: leave the sprite where it is.
-        },
-      };
-    }
-
-    // Subdued cosmetic wander for the Secretary, which has no scheduled state.
-    // Rarely drifts a short distance, idles briefly, walks back — "barely moves
-    // but isn't stationary". Uses fixed-duration tweens (not distance-based).
-    function setupSecretaryCosmeticWander(scene, sprite, opts) {
-      const rand = (lo, hi) => lo + Math.random() * (hi - lo);
-
-      function walk(x, onDone) {
-        scene.tweens.add({
-          targets: sprite, x: x, duration: opts.walkDurationMs,
-          ease: 'Sine.easeInOut', onComplete: onDone,
-        });
-      }
-
-      function scheduleNextWander() {
-        scene.time.delayedCall(rand(opts.idleAtHomeMinMs, opts.idleAtHomeMaxMs), () => {
-          const away = opts.awayPositions[Math.floor(Math.random() * opts.awayPositions.length)];
-          walk(away, () => {
-            scene.time.delayedCall(rand(opts.idleAwayMinMs, opts.idleAwayMaxMs), () => {
-              walk(opts.home, scheduleNextWander);
-            });
-          });
-        });
-      }
-
-      scene.time.delayedCall(opts.initialDelayMs, scheduleNextWander);
-    }
-
-    // ============================================================
-    // CLICKABLE OFFICE ELEMENTS (F.2b) — terminal-style popups.
-    // Called by Phaser pointerdown handlers in create(); mouseEvent is
-    // the native DOM event (clientX/clientY) used for positioning.
-    // ============================================================
-    function showPopup(type, mouseEvent) {
-      const popup = document.getElementById('popup');
-      const content = document.getElementById('popup-content');
-
-      let html = '';
-      if (type === 'character') {
-        html = buildCharacterPopup();
-      } else if (type === 'whiteboard') {
-        html = buildWhiteboardPopup();
-      } else if (type === 'workstation') {
-        html = buildWorkstationPopup();
-      } else if (type === 'waterCooler') {
-        html = buildWaterCoolerPopup();
-      } else if (type === 'elevator') {
-        html = buildElevatorPopup();
-      } else if (type === 'teamwork') {
-        html = buildTeamworkPopup();
-      } else if (type === 'window') {
-        html = buildWindowPopup();
-      } else if (type === 'printer') {
-        html = buildPrinterPopup();
-      }
-
-      content.innerHTML = html;
-      popup.style.display = 'block';
-
-      positionPopup(popup, mouseEvent);
-    }
-
-    function positionPopup(popup, mouseEvent) {
-      const x = mouseEvent.clientX + 12;
-      const y = mouseEvent.clientY + 12;
-      const popupRect = popup.getBoundingClientRect();
-      const maxX = window.innerWidth - popupRect.width - 10;
-      const maxY = window.innerHeight - popupRect.height - 10;
-      popup.style.left = Math.min(x, maxX) + 'px';
-      popup.style.top = Math.min(y, maxY) + 'px';
-    }
-
-    function hidePopup() {
-      document.getElementById('popup').style.display = 'none';
-    }
-
-    // Character popup. The on-canvas status overlay was removed; null-guard the
-    // optional read so the Deal Hunter click never throws if it is absent.
-    function buildCharacterPopup() {
-      const overlayEl = document.getElementById('status-overlay');
-      const overlay = overlayEl ? overlayEl.textContent + '\n\n' : '';
-      return `
-<div class="popup-title">AGENT PROFILE</div>
-NAME:    Deal Hunter
-ROLE:    Reddit lead scout
-STATUS:  Active
-${overlay}CYCLES:  --
-UPTIME:  --
-      `.trim();
-    }
-
-    // Whiteboard popup — hardcoded placeholder data.
-    function buildWhiteboardPopup() {
-      return `
-<div class="popup-title">REPORTS BOARD</div>
-SCANS RUN:       47
-LEADS FOUND:     12
-SUCCESS RATE:    25.5%
-LAST SCAN:       2 min ago
-
-ACTIVE SUBREDDITS:
-  r/Entrepreneur
-  r/smallbusiness
-  r/SaaS
-  r/marketing
-      `.trim();
-    }
-
-    // Workstation popup — hardcoded placeholder data.
-    function buildWorkstationPopup() {
-      return `
-<div class="popup-title">WORKSTATION 01</div>
-ASSIGNED:    Deal Hunter
-CURRENT TASK: idle
-LAST ACTIVITY: scanning r/SaaS
-QUEUE:       3 pending leads
-
-EQUIPMENT:
-  Monitor:   active
-  Keyboard:  active
-  Status:    operational
-      `.trim();
-    }
-
-    // Water cooler — easter egg with a random "agent thought".
-    function buildWaterCoolerPopup() {
-      const thoughts = [
-        "Should have used PRAW instead of raw HTTP for Reddit. Lesson learned.",
-        "73 DMs sent. 4 replies. Better than industry average. Keep grinding.",
-        "Is Kolio actually going to ship this or just keep polishing the UI?",
-        "If I could drink coffee, this would be cup five.",
-        "Wonder what the other agents are doing. Oh wait, there are no other agents yet.",
-        "Note to self: r/SaaS is gold. r/Entrepreneur is mostly noise.",
-        "Misho's LinkedIn outreach numbers were impressive last week.",
-        "Three clients at retainer = survival. Twelve = comfort. Twenty = real business.",
-        "The Hetzner VPS is cheaper than I expected. Good call.",
-        "Idle is fine. Idle is recovery. Idle is honest."
-      ];
-      const random = thoughts[Math.floor(Math.random() * thoughts.length)];
-      return `
-<div class="popup-title">WATER COOLER</div>
-Agent overheard thinking:
-
-"${random}"
-      `.trim();
-    }
-
-    // Elevator — system info / infrastructure status.
-    function buildElevatorPopup() {
-      return `
-<div class="popup-title">SYSTEM INFO</div>
-AGENT CENTRAL  v0.1.0
-DEAL HUNTER    v0.1.0
-
-SERVICES:
-  Dashboard  :8000  online
-  Command    :8001  online
-  Scanner    daemon online
-
-INFRASTRUCTURE:
-  Host:       Hetzner CX23
-  OS:         Ubuntu 24.04
-  Status:     operational
-      `.trim();
-    }
-
-    // TEAMWORK whiteboard — team/agent roster overview.
-    function buildTeamworkPopup() {
-      return `
-<div class="popup-title">TEAM OVERVIEW</div>
-ACTIVE AGENTS:  1
-TOTAL AGENTS:   1
-CAPACITY:       10 slots
-
-ROSTER:
-  [01] Deal Hunter    Reddit lead scout
-  [02] --             slot available
-  [03] --             slot available
-  [04] --             slot available
-  [05] --             slot available
-
-NEXT HIRE:
-  Closer        cold email reply handler
-      `.trim();
-    }
-
-    // Window — outside world / API health status.
-    function buildWindowPopup() {
-      return `
-<div class="popup-title">OUTSIDE WORLD</div>
-External services:
-
-REDDIT API     accessible
-ANTHROPIC API  responding
-BRAVE SEARCH   responding
-GITHUB         operational
-
-LAST CHECK:    just now
-NETWORK:       stable
-LATENCY:       ~80ms avg
-      `.trim();
-    }
-
-    // Printer/copier — recent output log.
-    function buildPrinterPopup() {
-      return `
-<div class="popup-title">PRINTER QUEUE</div>
-RECENT OUTPUT:
-
-  [11:42] DM draft → u/raincity87
-  [11:38] Lead report → r/SaaS scan
-  [11:24] DM draft → u/Tekelpath
-  [11:18] Status report → cycle 47
-
-QUEUE:         0 pending
-LAST ACTIVITY: just now
-TONER:         operational
-      `.trim();
-    }
-
-    // Wire up close button + click-outside-to-close.
-    document.getElementById('popup-close').addEventListener('click', hidePopup);
-
-    document.addEventListener('click', (e) => {
-      const popup = document.getElementById('popup');
-      if (popup.style.display === 'none') return;
-      if (popup.contains(e.target)) return;
-      // Click on the game canvas is handled by Phaser (it may open a popup) — don't close here.
-      if (e.target.tagName === 'CANVAS') return;
-      hidePopup();
-    });
-
-    const officeScene = {
-      key: 'OfficeScene',
-      preload() {
-        this.load.image(
-          'rixitic-example',
-          '/static/assets/tilesets/rixitic-sidescroller-office/example-v2-transparent.png'
-        );
-        this.load.image(
-          '2dpig-characters',
-          '/static/assets/tilesets/2dpig-pixel-office/PixelOfficeAssets.png'
-        );
-      },
-      create() {
-        // Rixitic example scene as the permanent office background.
-        // World layers (sky, sun, grass, dirt, walls, roof) are CSS around the
-        // canvas — see <div class="world-wrapper"> in HTML. Phaser only renders
-        // the office and character here.
-        const cx = this.scale.width / 2;
-        const cy = this.scale.height / 2;
-        this.add.image(cx, cy, 'rixitic-example');
-
-        // Register the dark-haired character sprite from the 2dPig sheet.
-        this.textures.get('2dpig-characters').add('deal-hunter', 0, 2, 96, 14, 24);
-
-        // Spawn Deal Hunter at the Operations zone.
-        const startZone = ZONE_MAP.operations;
-        this.dealHunter = this.add.image(startZone.x, startZone.y, '2dpig-characters', 'deal-hunter');
-        this.dealHunter.setOrigin(0.5, 1);
-        // Label above Deal Hunter (matches the Secretary label style). Deal Hunter
-        // moves between zones via tweens, so update() keeps the label glued to it.
-        this.dealHunterLabel = this.add.text(this.dealHunter.x, this.dealHunter.y - 26, 'DEAL HUNTER', {
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: '7px',
-          color: '#f4f0e0',
-          backgroundColor: '#243845',
-          padding: { x: 3, y: 1 },
-        }).setOrigin(0.5, 1);
-        this.currentZone = 'operations';
-        this.isWalking = false;
-
-        // --- Clickable office elements (F.2b) ---
-        // Coords are in native rixitic-image space (656×320); the image fills the canvas.
-        // Make the character clickable -> agent profile popup.
-        this.dealHunter.setInteractive({ cursor: 'pointer', useHandCursor: true });
-        this.dealHunter.on('pointerdown', (pointer) => {
-          showPopup('character', pointer.event);
-        });
-
-        // Whiteboard hitbox (REPORTS whiteboard on upper floor) — tuned to image.
-        const whiteboard = this.add.zone(290, 58, 70, 45);
-        whiteboard.setOrigin(0, 0);
-        whiteboard.setInteractive({ cursor: 'pointer', useHandCursor: true });
-        whiteboard.on('pointerdown', (pointer) => {
-          showPopup('whiteboard', pointer.event);
-        });
-
-        // Workstation hitbox (leftmost cubicle on lower floor) — tuned to image.
-        const workstation = this.add.zone(345, 250, 60, 45);
-        workstation.setOrigin(0, 0);
-        workstation.setInteractive({ cursor: 'pointer', useHandCursor: true });
-        workstation.on('pointerdown', (pointer) => {
-          showPopup('workstation', pointer.event);
-        });
-
-        // --- F.2c: five more clickable elements (coords tuned to image) ---
-        // Water cooler hitbox (right side of lower floor).
-        const waterCooler = this.add.zone(590, 250, 30, 50);
-        waterCooler.setOrigin(0, 0);
-        waterCooler.setInteractive({ cursor: 'pointer', useHandCursor: true });
-        waterCooler.on('pointerdown', (pointer) => {
-          showPopup('waterCooler', pointer.event);
-        });
-
-        // Elevator hitbox (lower floor, left side — the gray elevator door).
-        const elevator = this.add.zone(80, 240, 40, 52);
-        elevator.setOrigin(0, 0);
-        elevator.setInteractive({ cursor: 'pointer', useHandCursor: true });
-        elevator.on('pointerdown', (pointer) => {
-          showPopup('elevator', pointer.event);
-        });
-
-        // TEAMWORK whiteboard hitbox (upper floor, right of REPORTS).
-        const teamwork = this.add.zone(376, 56, 82, 48);
-        teamwork.setOrigin(0, 0);
-        teamwork.setInteractive({ cursor: 'pointer', useHandCursor: true });
-        teamwork.on('pointerdown', (pointer) => {
-          showPopup('teamwork', pointer.event);
-        });
-
-        // Window hitbox (upper floor, far right — dual window panels).
-        const window_ = this.add.zone(474, 46, 158, 66);
-        window_.setOrigin(0, 0);
-        window_.setInteractive({ cursor: 'pointer', useHandCursor: true });
-        window_.on('pointerdown', (pointer) => {
-          showPopup('window', pointer.event);
-        });
-
-        // Printer/copier hitbox (lower floor, left of the cubicles).
-        const printer = this.add.zone(298, 255, 38, 38);
-        printer.setOrigin(0, 0);
-        printer.setInteractive({ cursor: 'pointer', useHandCursor: true });
-        printer.on('pointerdown', (pointer) => {
-          showPopup('printer', pointer.event);
-        });
-
-        // --- Secretary character (Step 4) ---
-        // Stationary "front desk" agent on the lower floor (left-of-center).
-        // Reuses the Deal Hunter sprite frame, recolored with a muted blue tint,
-        // and never moves — distinguishing it from the walking worker agents.
-        const SECRETARY_TINT = 0x8a7fd0;
-        const secretarySprite = this.add.image(200, 290, '2dpig-characters', 'deal-hunter');
-        secretarySprite.setOrigin(0.5, 1);
-        secretarySprite.setTint(SECRETARY_TINT);
-        // Promoted to this.* so update() can follow the label as it wanders.
-        this.secretarySprite = secretarySprite;
-        this.secretaryLabel = this.add.text(200, 264, 'SECRETARY', {
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: '7px',
-          color: '#f4f0e0',
-          backgroundColor: '#243845',
-          padding: { x: 3, y: 1 },
-        }).setOrigin(0.5, 1);
-
-        secretarySprite.setInteractive({ cursor: 'pointer', useHandCursor: true });
-        secretarySprite.on('pointerdown', () => {
-          if (window.openSecretaryPopup) window.openSecretaryPopup();
-        });
-        // Subtle idle pulse so it reads as interactive.
-        this.tweens.add({
-          targets: secretarySprite, alpha: { from: 1, to: 0.7 },
-          duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
-        });
-        // Highlight hook called by secretary.js while the popup is open/closed.
-        window.setSecretaryGlow = (on) => {
-          if (on) secretarySprite.clearTint();
-          else secretarySprite.setTint(SECRETARY_TINT);
-        };
-        // Cosmetic wander — Secretary has no scheduled backend state to couple
-        // to, so it just drifts a little to add life. Centered on the reception
-        // counter (cols 11-14): small drift behind it, never off to the elevator.
-        setupSecretaryCosmeticWander(this, secretarySprite, {
-          home: 200,
-          awayPositions: [180, 225],
-          walkDurationMs: 4000,
-          idleAtHomeMinMs: 60000,   // 60-120s between wanders — mostly still
-          idleAtHomeMaxMs: 120000,
-          idleAwayMinMs: 5000,
-          idleAwayMaxMs: 10000,
-          initialDelayMs: Math.random() * 60000,
-        });
-
-        // --- Job Scout character (new agent, commit 1) ---
-        // Stationary agent that discovers job listings from public sources.
-        // Stands in the monitor bay (v2 layout): under the monitor bank on the
-        // lower floor, around col 25 (x400). Distinct green-yellow tint.
-        const JOB_SCOUT_TINT = 0xb8d070;
-        const jobScoutSprite = this.add.image(400, 290, '2dpig-characters', 'deal-hunter');
-        jobScoutSprite.setOrigin(0.5, 1);
-        jobScoutSprite.setTint(JOB_SCOUT_TINT);
-        this.jobScoutSprite = jobScoutSprite;
-        this.jobScoutLabel = this.add.text(400, 264, 'JOB SCOUT', {
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: '7px',
-          color: '#f4f0e0',
-          backgroundColor: '#243845',
-          padding: { x: 3, y: 1 },
-        }).setOrigin(0.5, 1);
-        const jobScoutPulse = this.tweens.add({
-          targets: jobScoutSprite, alpha: { from: 1, to: 0.7 },
-          duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
-        });
-        // Click -> Job Scout popup (commit 2b), with highlight while open.
-        jobScoutSprite.setInteractive({ cursor: 'pointer', useHandCursor: true });
-        jobScoutSprite.on('pointerdown', () => {
-          if (window.openJobScoutPopup) window.openJobScoutPopup();
-        });
-        window.setJobScoutGlow = (on) => {
-          if (on) jobScoutSprite.clearTint();
-          else jobScoutSprite.setTint(JOB_SCOUT_TINT);
-        };
-        // State-coupled walking: home (400) under the monitor bank, away (460)
-        // a short local step right within the bay while scanning sources.
-        const jobScoutWalker = makeCoupledWalker(this, jobScoutSprite, 400, 460, jobScoutPulse);
-
-        // --- Job Analyst character (new agent, commit 2a) ---
-        // Stationary agent that LLM-scores discovered jobs. Upper floor, right of
-        // Deal Hunter's writing-desk stand (420) — clear of all walking standing
-        // points. Distinct muted-red tint. No click handler yet (commit 2b).
-        const JOB_ANALYST_TINT = 0xd07f7f;
-        const jobAnalystSprite = this.add.image(480, 130, '2dpig-characters', 'deal-hunter');
-        jobAnalystSprite.setOrigin(0.5, 1);
-        jobAnalystSprite.setTint(JOB_ANALYST_TINT);
-        this.jobAnalystSprite = jobAnalystSprite;
-        this.jobAnalystLabel = this.add.text(480, 104, 'JOB ANALYST', {
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: '7px',
-          color: '#f4f0e0',
-          backgroundColor: '#243845',
-          padding: { x: 3, y: 1 },
-        }).setOrigin(0.5, 1);
-        const jobAnalystPulse = this.tweens.add({
-          targets: jobAnalystSprite, alpha: { from: 1, to: 0.7 },
-          duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
-        });
-        // Click -> Job Analyst popup (commit 2b), with highlight while open.
-        jobAnalystSprite.setInteractive({ cursor: 'pointer', useHandCursor: true });
-        jobAnalystSprite.on('pointerdown', () => {
-          if (window.openJobAnalystPopup) window.openJobAnalystPopup();
-        });
-        window.setJobAnalystGlow = (on) => {
-          if (on) jobAnalystSprite.clearTint();
-          else jobAnalystSprite.setTint(JOB_ANALYST_TINT);
-        };
-        // State-coupled walking: home (480) at desk, away (380) walked over to
-        // consult data/references while scanning.
-        const jobAnalystWalker = makeCoupledWalker(this, jobAnalystSprite, 480, 380, jobAnalystPulse);
-
-        // Initialize the zone LEDs for the starting zone (updateStatusText now
-        // only drives the LEDs; the on-canvas status text box was removed).
-        updateStatusText(this);
-
-        // Debug keyboard shortcuts — 1..5 walk Deal Hunter to each zone.
-        this.input.keyboard.on('keydown-ONE',   () => walkToZone(this, 'operations'));
-        this.input.keyboard.on('keydown-TWO',   () => walkToZone(this, 'communications'));
-        this.input.keyboard.on('keydown-THREE', () => walkToZone(this, 'writingDesk'));
-        this.input.keyboard.on('keydown-FOUR',  () => walkToZone(this, 'lounge'));
-        this.input.keyboard.on('keydown-FIVE',  () => walkToZone(this, 'research'));
-
-        // WebSocket connection to Agent Central backend — receives Deal Hunter state.
-        const scene = this;
-        let ws;
-        function connectWS() {
-          // Same-origin WS: derive host/port/scheme from the page so it works
-          // on whatever port the app is served from (and over wss:// through
-          // the https tunnel) — not a hardcoded :8001.
-          const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-          ws = new WebSocket(`${wsProto}//${location.host}/ws/status`);
-          ws.onopen = () => console.log('[WS] connected');
-          ws.onmessage = (event) => {
-            try {
-              const msg = JSON.parse(event.data);
-              if (msg.type === 'status') {
-                applyAgentState(scene, msg.payload);
-              } else if (msg.type === 'agent_states' && msg.agents) {
-                // Couple stationary-agent walking to backend state. Deal Hunter
-                // is driven by the legacy 'status' message above, untouched here.
-                if (msg.agents.job_scout) {
-                  jobScoutWalker.setState(msg.agents.job_scout.state);
-                }
-                if (msg.agents.job_analyst) {
-                  jobAnalystWalker.setState(msg.agents.job_analyst.state);
-                }
-              }
-            } catch (e) {
-              console.error('[WS] failed to parse message:', e);
-            }
-          };
-          ws.onclose = () => {
-            console.warn('[WS] disconnected, retrying in 3s...');
-            setTimeout(connectWS, 3000);
-          };
-          ws.onerror = (e) => console.error('[WS] error:', e);
-        }
-        connectWS();
-      },
-
-      update() {
-        // Keep the Deal Hunter label glued above the sprite through walk tweens
-        // and elevator teleports — no change to walkToZone needed.
-        if (this.dealHunter && this.dealHunterLabel) {
-          this.dealHunterLabel.x = this.dealHunter.x;
-          this.dealHunterLabel.y = this.dealHunter.y - 26;
-        }
-        // Stationary agents now move too — keep each label glued above its sprite.
-        const follow = (sprite, label) => {
-          if (sprite && label) { label.x = sprite.x; label.y = sprite.y - 26; }
-        };
-        follow(this.secretarySprite, this.secretaryLabel);
-        follow(this.jobScoutSprite, this.jobScoutLabel);
-        follow(this.jobAnalystSprite, this.jobAnalystLabel);
-      },
+    const MAP = {
+      deal_hunter: STATE_TO_ZONE,
+      job_scout:   {scanning:'BROWSE'},
+      job_analyst: {scanning:'THINKING'},
+      secretary:   {answering:'COMMS'},
     };
+    function directiveFor(id,state){
+      if(state==='offline') return {kind:'offline'};
+      if(state==='idle' || state==='error') return {kind:'roam', error: state==='error'};
+      const room=(MAP[id]||{})[state];
+      if(room) return {kind:'work', room};
+      return {kind:'roam'};
+    }
 
-    const config = {
-      type: Phaser.AUTO,
-      parent: 'game-container',
-      width: 656,
-      height: 320,
-      zoom: 1.5,
-      transparent: true,
-      backgroundColor: 'rgba(0, 0, 0, 0)',
-      pixelArt: true,
-      scene: officeScene,
-    };
+    // ---- agents (distinct pack NPCs at 2x) ----
+    const AGENTS = [
+      { id:'deal_hunter', name:'Deal Hunter', sheet:'deal_hunter', col:'#ffce5c', speed:48 },
+      { id:'job_scout',   name:'Job Scout',   sheet:'job_scout',   col:'#5fd0ff', speed:54 },
+      { id:'job_analyst', name:'Job Analyst', sheet:'job_analyst', col:'#ff8a72', speed:44 },
+      { id:'secretary',   name:'Secretary',   sheet:'secretary',   col:'#c79bff', speed:50 },
+    ];
+    const byId = {};
+    const claimed = {};                 // station node -> agent id
+    const COOL = {};                    // encounter cooldown per pair
 
-    window.addEventListener('DOMContentLoaded', () => {
-      new Phaser.Game(config);
-    });
+    function rnd(a,b){ return a+Math.random()*(b-a); }
+    function setPath(ag,dst){ if(dst===ag.cur){ return false; } const p=dijkstra(ag.cur,dst); if(p.length<2) return false; ag.path=p; ag.pi=0; ag.frac=0; return true; }
+    function releaseStation(ag){ if(ag.stationNode && claimed[ag.stationNode]===ag.id) delete claimed[ag.stationNode]; ag.stationNode=null; ag.station=null; }
+    function claimStation(ag,room){ const list=ROOM_STATIONS[room]||[]; for(const st of list){ if(!claimed[st.node] || claimed[st.node]===ag.id){ claimed[st.node]=ag.id; return st; } } return null; }
+
+    function applyDirective(ag,dir){
+      const same = ag.dir && ag.dir.kind===dir.kind && ag.dir.room===dir.room && !!ag.dir.error===!!dir.error;
+      ag.errored = !!dir.error;
+      if(same) return;
+      ag.dir = dir;
+      releaseStation(ag);
+      if(dir.kind==='offline'){ ag.mode='offline'; ag.sub='idle'; return; }
+      if(dir.kind==='work'){ ag.mode='work'; ag.sub='toseat'; ag.path=null; return; }
+      ag.mode='roam'; ag.sub='walk'; ag.path=null;     // idle/error: lurk + roam
+    }
+    function setBackendState(id,state){ const ag=byId[id]; if(!ag||state==null) return; applyDirective(ag, directiveFor(id,state)); }
+    // Named per-agent walkers: the agent_states message dispatches each agent's
+    // backend state through these into the sim (state = destination).
+    const jobScoutWalker   = { setState:(s)=>setBackendState('job_scout', s) };
+    const jobAnalystWalker = { setState:(s)=>setBackendState('job_analyst', s) };
+
+    function advance(ag,dt){
+      let move=ag.speed*dt;
+      while(move>1e-6){
+        if(ag.pi>=ag.path.length-1) return true;
+        const p=NODE[ag.path[ag.pi]], q=NODE[ag.path[ag.pi+1]];
+        const dx=q[0]-p[0],dy=q[1]-p[1],L=Math.hypot(dx,dy)||1, rem=L*(1-ag.frac);
+        if(move<rem){ ag.frac+=move/L; move=0; }
+        else { move-=rem; ag.pi++; ag.frac=0; ag.cur=ag.path[ag.pi]; }
+      }
+      const p=NODE[ag.path[ag.pi]], q=NODE[ag.path[Math.min(ag.pi+1,ag.path.length-1)]];
+      ag.x=p[0]+(q[0]-p[0])*ag.frac; ag.y=p[1]+(q[1]-p[1])*ag.frac;
+      const dx=q[0]-p[0],dy=q[1]-p[1]; ag.onStair=Math.abs(dy)>1.5;
+      if(dx<-0.5)ag.face=true; else if(dx>0.5)ag.face=false; ag.dist+=ag.speed*dt;
+      return false;
+    }
+
+    function update(dt){
+      for(const k in COOL){ COOL[k]-=dt; if(COOL[k]<=0) delete COOL[k]; }
+      for(const ag of AGENTS){
+        if(ag.mode==='offline'){ ag.moving=false; continue; }
+        if(ag.sub==='greet'){ ag.greetT-=dt; ag.moving=false; if(ag.greetT<=0) ag.sub = (ag.mode==='work')?'toseat':'walk'; continue; }
+        if(ag.mode==='work'){
+          if(ag.sub==='sit'){ ag.moving=false; continue; }
+          if(!ag.station){ const st=claimStation(ag,ag.dir.room); if(!st){ ag.mode='roam'; ag.sub='walk'; ag.path=null; continue; } ag.station=st; ag.stationNode=st.node; ag.path=null; }
+          if(!ag.path){ if(!setPath(ag,ag.stationNode)){ ag.sub='sit'; ag.x=NODE[ag.stationNode][0]; ag.y=NODE[ag.stationNode][1]; ag.moving=false; continue; } }
+          ag.moving=true; if(advance(ag,dt)){ ag.sub='sit'; ag.x=NODE[ag.stationNode][0]; ag.y=NODE[ag.stationNode][1]; ag.moving=false; }
+          continue;
+        }
+        // roam: lurk everywhere
+        if(ag.sub==='pause'){ ag.pauseT-=dt; ag.moving=false; if(ag.pauseT<=0){ ag.sub='walk'; ag.path=null; } continue; }
+        if(!ag.path){ let dst; for(let t=0;t<8;t++){ dst=NODE_IDS[(Math.random()*NODE_IDS.length)|0]; if(dst!==ag.cur) break; } if(!setPath(ag,dst)){ ag.sub='pause'; ag.pauseT=rnd(0.4,1.0); continue; } }
+        ag.moving=true; if(advance(ag,dt)){ ag.sub='pause'; ag.pauseT=rnd(0.7,1.8); ag.moving=false; }
+      }
+      // encounters: two moving agents, same floor, close -> stop, face, greet
+      for(let i=0;i<AGENTS.length;i++)for(let j=i+1;j<AGENTS.length;j++){ const a=AGENTS[i],b=AGENTS[j];
+        if(a.moving&&b.moving&&!a.onStair&&!b.onStair&&Math.abs(a.y-b.y)<8&&Math.hypot(a.x-b.x,a.y-b.y)<TRIGGER){
+          const key=a.id+'|'+b.id; if(!(COOL[key]>0)){ a.sub='greet';a.greetT=GREET;b.sub='greet';b.greetT=GREET;
+            a.moving=false;b.moving=false; a.face=(b.x<a.x); b.face=(a.x<b.x); COOL[key]=GREET+4; } }
+      }
+    }
+
+    // ---- render helpers ----
+    function drawAgent(ctx,sheet,x,y,col,row,faceLeft,alpha){ const im=IMG[sheet]; const sx=Math.round(x-32),sy=Math.round(y-48);
+      if(alpha!=null) ctx.globalAlpha=alpha;
+      if(faceLeft){ctx.save();ctx.translate(sx+64,sy);ctx.scale(-1,1);ctx.drawImage(im,col*32,row*32,32,32,0,0,64,64);ctx.restore();}
+      else ctx.drawImage(im,col*32,row*32,32,32,sx,sy,64,64);
+      if(alpha!=null) ctx.globalAlpha=1; }
+    function drawItem(ctx,rk,it){ const r=ROOMS[rk],ix=r.x+B,iy=r.y+B; const [k,dx,dy,fl]=it; const im=IMG[k],sw=im.width*2,sh=im.height*2;
+      ctx.save();ctx.beginPath();ctx.rect(ix,iy,r.w-2*B,r.h-2*B);ctx.clip();
+      if(fl==='F'){ctx.translate(ix+dx+sw,iy+dy);ctx.scale(-1,1);ctx.drawImage(im,0,0,sw,sh);}else ctx.drawImage(im,ix+dx,iy+dy,sw,sh); ctx.restore(); }
+    function glowScreen(ctx,x,y,w,h){ ctx.fillStyle='#0b2a2a';ctx.fillRect(x,y,w,h); ctx.fillStyle='#3fe3cb';ctx.fillRect(x+1,y+1,w-2,h-2); ctx.fillStyle='#c9fff4';ctx.fillRect(x+2,y+2,Math.max(4,w-12),2); }
+    function drawLight(ctx,L){ if(L.type==='mon'){ctx.drawImage(IMG.monitor,L.x,L.y,24,16);glowScreen(ctx,L.x+2,L.y+2,20,10);}
+      else if(L.type==='monS'){ctx.drawImage(IMG.monitorS,L.x,L.y,20,16);glowScreen(ctx,L.x+2,L.y+2,16,10);}
+      else if(L.type==='laptop'){ctx.drawImage(IMG.laptop,L.x,L.y,20,14);glowScreen(ctx,L.x+2,L.y+1,16,7);} }
+    function drawWorkBubble(ctx,bx,by){ ctx.fillStyle='#11141c';ctx.fillRect(bx-1,by-1,20,13);ctx.fillStyle='#11141c';ctx.fillRect(bx-3,by+13,5,5);
+      ctx.fillStyle='#f4f6fb';ctx.fillRect(bx,by,18,11);ctx.fillStyle='#f4f6fb';ctx.fillRect(bx-2,by+12,5,3);ctx.fillRect(bx,by+11,3,2);
+      ctx.fillStyle='#2bd66f';ctx.fillRect(bx+3,by+4,3,3);ctx.fillStyle='#9aa2b4';ctx.fillRect(bx+8,by+5,2,2);ctx.fillRect(bx+12,by+5,2,2); }
+    function drawGreetBubble(ctx,bx,by){ ctx.fillStyle='#11141c';ctx.fillRect(bx-1,by-1,16,13);ctx.fillStyle='#11141c';ctx.fillRect(bx+10,by+13,5,5);
+      ctx.fillStyle='#fff3d8';ctx.fillRect(bx,by,14,11);ctx.fillStyle='#fff3d8';ctx.fillRect(bx+11,by+12,4,3);ctx.fillRect(bx+12,by+11,3,2);
+      ctx.fillStyle='#ff9b3d';ctx.fillRect(bx+6,by+2,2,5);ctx.fillRect(bx+6,by+8,2,2); }
+    function drawLabel(ctx,nx,headTopY,name,color,dim){ const cx=nx*S, baseY=headTopY*S-7;
+      ctx.font='bold 10px JetBrains Mono, monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      const w=Math.ceil(ctx.measureText(name).width)+8, h=14, x=cx-w/2, y=baseY-h;
+      ctx.globalAlpha = dim?0.5:1;
+      ctx.fillStyle='rgba(10,12,18,0.92)'; ctx.fillRect(x,y,w,h);
+      ctx.strokeStyle=color; ctx.lineWidth=1; ctx.strokeRect(x+0.5,y+0.5,w-1,h-1);
+      ctx.fillStyle='rgba(10,12,18,0.92)'; ctx.beginPath(); ctx.moveTo(cx-3,y+h);ctx.lineTo(cx+3,y+h);ctx.lineTo(cx,y+h+4);ctx.closePath();ctx.fill();
+      ctx.fillStyle=color; ctx.fillText(name,cx,y+h/2+0.5); ctx.globalAlpha=1; }
+
+    let off,octx,view,vctx;
+    function render(){
+      octx.fillStyle=BEAM; octx.fillRect(0,0,NW,NH);
+      for(const k in ROOMS) drawRoom(octx,ROOMS[k]);
+      for(const s of STAIRS) staircase(octx,...s);
+      for(const [x,y] of DOORS){ octx.fillStyle='#14141a'; octx.fillRect(x-2,y-12,4,12); }
+      const order=[...AGENTS].sort((p,q)=>p.y-q.y);
+      for(const ag of order){
+        if(ag.mode==='offline'){ drawAgent(octx,ag.sheet,ag.x,ag.y,0,1,ag.face,0.32); continue; }
+        if(ag.sub==='greet'){ drawAgent(octx,ag.sheet,ag.x,ag.y,0,1,ag.face); drawGreetBubble(octx,Math.round(ag.x)-7,Math.round(ag.y)-46); continue; }
+        if(ag.mode==='work'&&ag.sub==='sit'){
+          drawAgent(octx,ag.sheet,ag.x,ag.y,0,1,ag.face);
+          if(ag.station.type==='desk'){ const seat=SEATS[ag.stationNode]; for(const [rk,it] of seat.occ) drawItem(octx,rk,it); if(seat.light) drawLight(octx,seat.light); drawWorkBubble(octx,seat.bubble.x,seat.bubble.y); }
+          else { drawWorkBubble(octx,Math.round(ag.x)-9,Math.round(ag.y)-44); }
+          continue;
+        }
+        if(ag.moving){ const c=Math.floor(ag.dist/STRIDE)%4; drawAgent(octx,ag.sheet,ag.x,ag.y,c,0,ag.face); }
+        else drawAgent(octx,ag.sheet,ag.x,ag.y,0,1,ag.face);
+      }
+      vctx.imageSmoothingEnabled=false; vctx.clearRect(0,0,NW*S,NH*S); vctx.drawImage(off,0,0,NW,NH,0,0,NW*S,NH*S);
+      for(const ag of order){
+        if(ag.glow){ vctx.strokeStyle=ag.col; vctx.lineWidth=2; vctx.strokeRect((ag.x-13)*S, (ag.y-30)*S, 26*S, 32*S); }
+        drawLabel(vctx, ag.x, ag.y-28, ag.name, ag.col, ag.mode==='offline');
+      }
+    }
+
+    let last=0;
+    function loop(now){ const dt=Math.min(0.05,(now-last)/1000||0); last=now; update(dt); render(); requestAnimationFrame(loop); }
+
+    function connectWS(){
+      const wsProto = location.protocol==='https:'?'wss:':'ws:';
+      let ws = new WebSocket(`${wsProto}//${location.host}/ws/status`);
+      ws.onopen = ()=>console.log('[WS] connected');
+      ws.onmessage = (event)=>{ try{ const msg=JSON.parse(event.data);
+        if(msg.type==='status' && msg.payload && msg.payload.agent_id){ setBackendState(msg.payload.agent_id, msg.payload.state); }
+        else if(msg.type==='agent_states' && msg.agents){
+          if(msg.agents.deal_hunter) setBackendState('deal_hunter', msg.agents.deal_hunter.state);
+          if(msg.agents.job_scout)   jobScoutWalker.setState(msg.agents.job_scout.state);
+          if(msg.agents.job_analyst) jobAnalystWalker.setState(msg.agents.job_analyst.state);
+          if(msg.agents.secretary)   setBackendState('secretary', msg.agents.secretary.state);
+        }
+      }catch(e){ console.error('[WS] parse', e); } };
+      ws.onclose = ()=>{ console.warn('[WS] disconnected, retry 3s'); setTimeout(connectWS,3000); };
+      ws.onerror = (e)=>console.error('[WS] error', e);
+    }
+
+    function initAgents(){
+      const starts={deal_hunter:'LOUNGE_W', job_scout:'BR3', job_analyst:'LIB_C', secretary:'CTRL_C'};
+      let i=0;
+      for(const ag of AGENTS){ byId[ag.id]=ag; const n=starts[ag.id]; ag.cur=n; ag.x=NODE[n][0]; ag.y=NODE[n][1];
+        ag.mode='roam'; ag.sub='pause'; ag.pauseT=0.2+0.3*i; ag.path=null; ag.pi=0; ag.frac=0; ag.dist=0; ag.face=false; ag.onStair=false; ag.moving=false;
+        ag.dir={kind:'roam'}; ag.errored=false; ag.glow=false; ag.station=null; ag.stationNode=null; i++; }
+    }
+    function hitTest(mx,my){ // display coords -> nearest agent within range
+      const nx=mx/S, ny=my/S; let best=null,bd=18;
+      for(const ag of AGENTS){ const d=Math.hypot(ag.x-nx, (ag.y-14)-ny); if(d<bd){ bd=d; best=ag; } }
+      return best;
+    }
+    function start(){
+      const host=document.getElementById('game-container'); host.innerHTML='';
+      view=document.createElement('canvas'); view.id='living-canvas'; view.width=NW*S; view.height=NH*S;
+      view.style.display='block'; view.style.cursor='default';
+      host.appendChild(view); vctx=view.getContext('2d');
+      off=document.createElement('canvas'); off.width=NW; off.height=NH; octx=off.getContext('2d'); octx.imageSmoothingEnabled=false;
+      const popups={ job_scout:'openJobScoutPopup', job_analyst:'openJobAnalystPopup', secretary:'openSecretaryPopup' };
+      view.addEventListener('click',(e)=>{ const r=view.getBoundingClientRect(); const ag=hitTest(e.clientX-r.left, e.clientY-r.top);
+        if(ag && popups[ag.id] && window[popups[ag.id]]) window[popups[ag.id]](); });
+      view.addEventListener('mousemove',(e)=>{ const r=view.getBoundingClientRect(); const ag=hitTest(e.clientX-r.left, e.clientY-r.top); view.style.cursor=(ag&&popups[ag.id])?'pointer':'default'; });
+      // glow hooks used by the popup helper scripts
+      window.setSecretaryGlow=(on)=>{ if(byId.secretary) byId.secretary.glow=!!on; };
+      window.setJobScoutGlow=(on)=>{ if(byId.job_scout) byId.job_scout.glow=!!on; };
+      window.setJobAnalystGlow=(on)=>{ if(byId.job_analyst) byId.job_analyst.glow=!!on; };
+      initAgents(); connectWS(); requestAnimationFrame(loop);
+    }
+
+    let pend=Object.keys(SRC).length;
+    for(const k in SRC){ const im=new Image(); im.onload=()=>{ if(--pend===0) start(); }; im.onerror=()=>{ console.error('asset fail',SRC[k]); if(--pend===0) start(); }; im.src=ASSET+SRC[k]; IMG[k]=im; }
   </script>
 
 </body>

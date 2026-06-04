@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Function-room building - BLOCKOUT</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#12141b; color:#cfd2dc; font-family:'Consolas','JetBrains Mono',monospace; padding:20px 26px; }
+  h1 { font-size:15px; color:#7cc8ff; margin-bottom:4px; }
+  p.sub { font-size:12px; color:#8b92a4; margin-bottom:16px; max-width:920px; }
+  #stage { background:#11131a; border:1px solid #2a2e3a; }
+</style>
+</head>
+<body>
+  <h1>FUNCTION-ROOM BUILDING - BLOCKOUT (layout only)</h1>
+  <p class="sub">One solid interlocking building: rooms share walls and floors. Vertical story: LOUNGE base / work middle (BROWSE+WRITING, then THINKING beside LIBRARY-over-COMMS) / CONTROL glass watchtower set back on top. Circulation = real stepped staircases (stairs + doors only, no elevator), zigzagging so you can trace a climb from LOUNGE up to CONTROL; dark notches = doors.</p>
+  <canvas id="stage"></canvas>
+
+<script>
+const S = 4;
+const NW = 360, NH = 348;
+
+// Interlocking rooms (shared walls/floors). [name, x, y, w, h, color, sub]
+const ROOMS = [
+  ['CONTROL',   70,   6, 220, 64, '#5fb9cf', 'glass watchtower / oversight'],
+  ['THINKING',   0,  70, 175,128, '#9a7fe0', 'tall - reason'],
+  ['LIBRARY',  175,  70, 185, 64, '#43b06a', 'cozy mezzanine - memory'],
+  ['COMMS',    175, 134, 185, 64, '#4f93d6', 'communicate'],
+  ['BROWSE',     0, 198, 250, 64, '#e6953a', 'wide terminal floor - perceive'],
+  ['WRITING',  250, 198, 110, 64, '#d473a6', 'small - produce'],
+  ['LOUNGE',     0, 262, 360, 74, '#d76a49', 'ground - rest / gather / entrance'],
+];
+
+// Staircases, each spanning ONE floor-to-floor band: [x, y, w, h, dir]
+// dir 'R' rises up to the right, 'L' rises up to the left (zigzag switchback).
+const STAIRS = [
+  [294, 262, 60, 74, 'L'],   // LOUNGE floor  -> BROWSE/WRITING floor
+  [  6, 198, 60, 64, 'R'],   // BROWSE floor  -> THINKING floor
+  [294, 134, 60, 64, 'L'],   // COMMS floor   -> LIBRARY floor
+  [178,  70, 60, 64, 'R'],   // LIBRARY floor -> CONTROL floor
+];
+
+// Doors (dark notches): stair landings + same-level shared-wall passages [x, y(floor)]
+const DOORS = [
+  [292, 262],          // onto stair1 landing (browse/writing floor)
+  [ 66, 198],          // onto stair2 landing (thinking floor)
+  [175, 198],          // THINKING <-> COMMS shared wall (same floor)
+  [292, 134],          // onto stair3 landing (library floor)
+  [250, 262],          // BROWSE <-> WRITING shared wall (same floor)
+  [262,  70],          // onto stair4 landing (control floor)
+];
+
+function shade(hex, f) {
+  const n = parseInt(hex.slice(1),16), r=n>>16, g=(n>>8)&255, b=n&255, d=v=>Math.round(v*(1-f));
+  return `rgb(${d(r)},${d(g)},${d(b)})`;
+}
+function room(ctx, name,x,y,w,h,col,sub) {
+  ctx.fillStyle = col; ctx.fillRect(x*S, y*S, w*S, h*S);
+  ctx.strokeStyle = shade(col,0.5); ctx.lineWidth = 3; ctx.strokeRect(x*S+1.5, y*S+1.5, w*S-3, h*S-3);
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  const big = Math.max(14, Math.min(h*S*0.30, w*S*0.18));
+  const cx=(x+w/2)*S, cy=(y+h/2)*S, off = h>80 ? big*0.55 : 0;
+  ctx.fillStyle='#16161e'; ctx.font=`bold ${big}px Consolas`; ctx.fillText(name, cx, cy-off);
+  ctx.fillStyle='rgba(20,20,28,0.78)'; ctx.font=`${Math.max(10,big*0.4)}px Consolas`;
+  ctx.fillText(sub, cx, cy + (h>80?big*0.7:big*0.95));
+}
+// Substantial stepped staircase: columns of increasing height across the band,
+// bottom sitting on the lower floor, top landing on the upper floor.
+function staircase(ctx, x,y,w,h,dir) {
+  const n = 8, tw = w/n, th = h/n;
+  for (let i=0; i<n; i++) {
+    const colH = (i+1)*th;
+    const colX = (dir==='R') ? x + i*tw : x + (n-1-i)*tw;
+    const colY = y + h - colH;
+    ctx.fillStyle = '#878b95'; ctx.fillRect(colX*S, colY*S, tw*S, colH*S);
+    ctx.fillStyle = '#c6cad4'; ctx.fillRect(colX*S, colY*S, tw*S, 3);          // tread
+    ctx.fillStyle = '#5c606a'; ctx.fillRect((colX+ (dir==='R'?tw:0))*S-1, colY*S, 1, colH*S); // riser shade
+  }
+  // landing platform at the top (upper floor) + base at the bottom (lower floor)
+  ctx.fillStyle = '#aeb2bc';
+  const landX = (dir==='R') ? x + w - tw*2 : x;
+  ctx.fillRect(landX*S, y*S - 2, tw*2*S, 5);                 // top landing
+  ctx.fillRect(x*S, (y+h)*S - 3, w*S, 5);                    // base on lower floor
+}
+
+function main() {
+  const c = document.getElementById('stage');
+  c.width = NW*S; c.height = NH*S;
+  const ctx = c.getContext('2d');
+
+  // sky behind the set-back watchtower (top corners) + ground
+  ctx.fillStyle = '#1b2433'; ctx.fillRect(0, 6*S, NW*S, 64*S);   // sky band by the tower
+  ctx.fillStyle = '#2c2f3a'; ctx.fillRect(0, 336*S, NW*S, (NH-336)*S);
+  ctx.fillStyle = '#3a4150'; ctx.fillRect(0, 336*S, NW*S, 3);
+
+  for (const r of ROOMS) room(ctx, ...r);          // solid interlocking rooms
+  for (const s of STAIRS) staircase(ctx, ...s);     // stairs on top (stairwells)
+  for (const [x,y] of DOORS) { ctx.fillStyle='#14141a'; ctx.fillRect(x*S-4, (y-11)*S, 8, 11*S); }
+}
+main();
+</script>
+</body>
+</html>

@@ -390,6 +390,14 @@ async def secretary_ask(payload: AskRequest):
     top_k = min(payload.top_k or 5, 20)
 
     from agent_central import secretary
+    # Living-office hook: mark the Secretary 'answering' while it works (the only
+    # backend change in stage G). The poller broadcasts it via agent_states and
+    # the visual walks the Secretary to Comms, then back to idle on completion.
+    try:
+        activity_log.log_event("secretary", "state_change", state="answering",
+                               metadata={"event": "ask_start"})
+    except Exception:
+        logger.exception("secretary state (answering) failed")
     try:
         result = await asyncio.to_thread(
             secretary.ask_secretary,
@@ -399,6 +407,12 @@ async def secretary_ask(payload: AskRequest):
     except Exception:
         logger.exception("Secretary ask failed")
         raise HTTPException(status_code=500, detail="Internal error processing question")
+    finally:
+        try:
+            activity_log.log_event("secretary", "state_change", state="idle",
+                                   metadata={"event": "ask_done"})
+        except Exception:
+            logger.exception("secretary state (idle) failed")
 
     return result
 

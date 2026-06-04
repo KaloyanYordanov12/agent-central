@@ -1,0 +1,223 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Stage B - the connected building</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#11131a; color:#cfd2dc; font-family:'Consolas','JetBrains Mono',monospace; padding:22px 26px; }
+  h1 { font-size:15px; color:#ffb060; margin-bottom:4px; }
+  p.sub { font-size:12px; color:#8b92a4; margin-bottom:18px; max-width:760px; }
+  #stage { image-rendering:pixelated; image-rendering:-webkit-optimize-contrast;
+           transform-origin:top left; border:1px solid #2a2e3a; }
+</style>
+</head>
+<body>
+  <h1 id="title">STAGE B</h1>
+  <p class="sub" id="sub"></p>
+  <canvas id="stage"></canvas>
+
+<script>
+// ---------------------------------------------------------------------------
+// Stage B harness. ONE canvas, native px, shown 4x via CSS, image-rendering
+// pixelated. EVERY surface is a real Pixel Spaces PNG sliced from a sheet and
+// tiled (no procedural/code-drawn walls/floors/textures). Structured off
+// FLOORS / ROOMS_PER_FLOOR so 4 rooms -> 10 is a one-number change.
+// ---------------------------------------------------------------------------
+const STAGE = 'B2';
+const SCALE = 4;
+const CELL_W = 128, CELL_H = 62;   // shorter rooms (less bare wall up top)
+const WALL_H = 24;                 // brick wall band; floor below
+const SHAFT_W = 34;                // central elevator shaft (one open channel)
+const DIV_W = 5, SLAB_H = 5;       // structural divider walls + floor/ceiling slabs
+const SHAFT_BG = '#241f1c';        // dark elevator-shaft channel
+
+// Tower scales off these two constants. FLOORS 2 -> 10 is a one-number change.
+const ROOMS_PER_FLOOR = 2;         // left + right of the circulation column
+const FLOORS = 2;
+
+const FLOOR_BG = '#e6904e';        // warm floor backdrop (behind real floor tile)
+const WALL_BG  = '#cd683d';        // brick backdrop (behind real brick tile)
+const BEAM     = '#3a281c';        // structural slabs + divider walls (dark warm)
+const BEAM_HI  = '#5a4030';        // slab/divider highlight edge
+
+// ---- assets: every surface + prop is a real pack PNG ----------------------
+const ASSET = '../agent_central/static/assets/pixelspaces/';
+const SRC = {
+  wall:   'walls/wall_warm.png',     // sliced from Wallpaper Tilesets.png brick panel
+  floor:  'walls/floor_warm.png',    // sliced from Wallpaper Tilesets.png warm floor band
+  window: 'objects/Window_square.png',
+  shelf:  'furniture/Bookshelf_1.png',
+  desk:   'furniture/Drawerdesk.png',
+  chair:  'furniture/Officechair_blue.png',
+  monitor:'objects/Monitor.png',
+  lamp:   'objects/Desk_lamp.png',
+  plant:  'objects/Flora_bonsai.png',
+  sign:   'objects/Clipboard_wall.png',
+  agent:  'npc/agent1.png',          // 160x96 sheet, 32x32 frames
+  stairs: 'infrastructure/Stairs.png',         // 56x56 warm wood staircase
+  elevator:'infrastructure/Elevator_closed.png', // 26x23
+  door:   'infrastructure/Door_wood_opened.png', // 13x23 open wood doorway
+  // dense furnishing set (identity via contents)
+  shelf2: 'furniture/Bookshelf_2.png', shelfS: 'furniture/Bookshelf_small.png',
+  couch:  'furniture/Couch_small_red.png', table: 'furniture/Coffee_table_1.png',
+  stool:  'furniture/Stool_red.png', light1: 'furniture/Light_1.png', light2: 'furniture/Light_2.png',
+  poster1:'objects/Poster_1.png', poster2:'objects/Poster_2.png', poster3:'objects/Poster_3.png',
+  clock:  'objects/Clock_1_red.png', trophy:'objects/Trophy.png', books:'objects/Books_outside_1.png',
+  fern:   'objects/Flora_fern.png', snake:'objects/Flora_snake.png', pot:'objects/Flowerpot_medium_red.png',
+  poster5:'objects/Poster_5.png', poster6:'objects/Poster_6.png', poster7:'objects/Poster_7.png',
+};
+const IMG = {};
+let pending = Object.keys(SRC).length;
+for (const k in SRC) {
+  const im = new Image();
+  im.onload = () => { if (--pending === 0) main(); };
+  im.onerror = () => console.error('failed to load', SRC[k]);
+  im.src = ASSET + SRC[k]; IMG[k] = im;
+}
+
+// tile a real PNG across a rect, clipping partial tiles at the edges
+function tile(ctx, img, x, y, w, h) {
+  ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  for (let ty = y; ty < y + h; ty += img.height)
+    for (let tx = x; tx < x + w; tx += img.width)
+      ctx.drawImage(img, tx, ty);
+  ctx.restore();
+}
+// draw the NPC idle frame (sheet row1 col0 = sx 0, sy 32) at native (x,y)
+function agentIdle(ctx, x, y) { ctx.drawImage(IMG.agent, 0, 32, 32, 32, x, y, 32, 32); }
+
+function floorSurface(ctx, ox, oy) {
+  ctx.fillStyle = FLOOR_BG; ctx.fillRect(ox, oy + WALL_H, CELL_W, CELL_H - WALL_H);
+  tile(ctx, IMG.floor, ox, oy + WALL_H, CELL_W, CELL_H - WALL_H);
+}
+
+// B1 recipe (used only by STAGE B1).
+function drawRoomB1(ctx, ox, oy) {
+  ctx.fillStyle = WALL_BG; ctx.fillRect(ox, oy, CELL_W, WALL_H);
+  tile(ctx, IMG.wall, ox, oy, CELL_W, WALL_H);
+  floorSurface(ctx, ox, oy);
+  ctx.drawImage(IMG.window, ox + 86, oy + 9);  ctx.drawImage(IMG.sign, ox + 30, oy + 9);
+  ctx.drawImage(IMG.shelf, ox + 8, oy + 38);   ctx.drawImage(IMG.plant, ox + 112, oy + 62);
+  ctx.drawImage(IMG.lamp, ox + 40, oy + 61);   ctx.drawImage(IMG.chair, ox + 60, oy + 55);
+  agentIdle(ctx, ox + 52, oy + 38);            ctx.drawImage(IMG.desk, ox + 50, oy + 61);
+  ctx.drawImage(IMG.monitor, ox + 49, oy + 54);
+}
+
+// Brick wall + warm floor, identical material in EVERY cell (rooms + corridor).
+function brickShell(ctx, ox, oy, w) {
+  ctx.fillStyle = WALL_BG; ctx.fillRect(ox, oy, w, WALL_H);
+  tile(ctx, IMG.wall, ox, oy, w, WALL_H);
+  ctx.fillStyle = FLOOR_BG; ctx.fillRect(ox, oy + WALL_H, w, CELL_H - WALL_H);
+  tile(ctx, IMG.floor, ox, oy + WALL_H, w, CELL_H - WALL_H);
+}
+
+// Per-room CONTENTS give identity (each a different cluster of real props).
+// Item = [imgKey, dx, dy] offset from the room origin, drawn back -> front.
+const ROOM_CONTENTS = [
+  { items: [   // 0 WORKSTATION
+    ['poster6',12,5],['clock',104,6],['window',40,6],
+    ['shelf',6,35],['trophy',7,28],['fern',112,48],
+    ['chair',58,47],['desk',50,51],['monitor',49,43],['books',66,47],['lamp',74,43],
+  ]},
+  { items: [   // 1 LIBRARY
+    ['poster3',96,5],['sign',30,5],
+    ['shelf',16,35],['shelf2',32,35],['shelfS',98,46],['books',100,42],
+    ['snake',62,49],['stool',82,52],['pot',112,55],
+  ]},
+  { items: [   // 2 LOUNGE
+    ['poster5',14,5],['clock',74,6],['window',92,6],
+    ['shelfS',6,46],['pot',24,55],
+    ['couch',40,45],['table',58,51],['stool',86,52],['fern',108,48],
+  ]},
+  { items: [   // 3 OFFICE
+    ['clock',20,6],['poster7',96,5],['window',58,6],
+    ['shelf2',108,35],['trophy',109,28],['snake',14,49],
+    ['chair',58,47],['desk',50,51],['lamp',50,43],['monitor',64,43],['books',54,47],
+  ]},
+];
+
+function drawRoom(ctx, ox, oy, contents) {
+  brickShell(ctx, ox, oy, CELL_W);
+  for (const [k, dx, dy] of contents.items) ctx.drawImage(IMG[k], ox + dx, oy + dy);
+}
+
+// One continuous open elevator shaft down the centre, full tower height.
+function drawShaft(ctx, sx, towerH) {
+  ctx.fillStyle = SHAFT_BG; ctx.fillRect(sx, 0, SHAFT_W, towerH);
+}
+// Closed elevator doors (the car/landing) for one floor, centred in the shaft.
+function drawElevatorCar(ctx, sx, oy) {
+  ctx.drawImage(IMG.elevator, sx + (SHAFT_W - 26) / 2, oy + 37);  // bottom on the floor
+}
+
+// Structural beam frame: full-height vertical divider walls + horizontal floor/
+// ceiling slabs that run ONLY across the room columns (slabSegs), leaving the
+// central shaft as one open channel. Each room reads as its own bounded cell.
+function drawFrame(ctx, towerW, towerH, dividerXs, slabSegs) {
+  for (const dx of dividerXs) {
+    ctx.fillStyle = BEAM;    ctx.fillRect(dx, 0, DIV_W, towerH);
+    ctx.fillStyle = BEAM_HI; ctx.fillRect(dx, 0, 1, towerH);
+  }
+  for (let f = 0; f <= FLOORS; f++) {
+    const sy = f * (CELL_H + SLAB_H);
+    for (const [a, b] of slabSegs) {
+      ctx.fillStyle = BEAM;    ctx.fillRect(a, sy, b - a, SLAB_H);
+      ctx.fillStyle = BEAM_HI; ctx.fillRect(a, sy, b - a, 1);
+    }
+  }
+}
+
+// Open wood doorway over a divider, so a room opens into the corridor.
+function drawDoor(ctx, x, oy) { ctx.drawImage(IMG.door, x, oy + 37); }
+
+function setupCanvas(w, h) {
+  const c = document.getElementById('stage');
+  c.width = w; c.height = h;
+  c.style.width = (w * SCALE) + 'px'; c.style.height = (h * SCALE) + 'px';
+  const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+  return ctx;
+}
+
+function main() {
+  document.getElementById('title').textContent = 'STAGE ' + STAGE;
+  if (STAGE === 'B1') {
+    document.getElementById('sub').textContent =
+      'B1 (real art only): tiled brick wall + warm floor band + real window + furniture + seated agent.';
+    const ctx = setupCanvas(CELL_W, CELL_H);
+    drawRoomB1(ctx, 0, 0);
+  } else if (STAGE === 'B2') {
+    document.getElementById('sub').textContent =
+      'B2: ' + ROOMS_PER_FLOOR + ' rooms x ' + FLOORS + ' floors off FLOORS/ROOMS_PER_FLOOR. Structural beam slabs + divider walls box each room. Brick walls everywhere; identity from contents (workstation / library / lounge / office). Central column = elevator only; rooms open into it via real doorways. Plain dark behind (world in B3).';
+    const ROOM_L_X = DIV_W;                          // left room
+    const SHAFT_X  = DIV_W + CELL_W + DIV_W;         // 138: open shaft channel
+    const ROOM_R_X = SHAFT_X + SHAFT_W + DIV_W;      // right room
+    const towerW = ROOM_R_X + CELL_W + DIV_W;
+    const towerH = FLOORS * (CELL_H + SLAB_H) + SLAB_H;
+    const wallL = SHAFT_X - DIV_W;                   // 133: wall between left room + shaft
+    const wallR = SHAFT_X + SHAFT_W;                 // 172: wall between shaft + right room
+    const ctx = setupCanvas(towerW, towerH);
+
+    drawShaft(ctx, SHAFT_X, towerH);                 // one continuous shaft, full height
+    for (let f = 0; f < FLOORS; f++) {
+      const oy = SLAB_H + f * (CELL_H + SLAB_H);
+      drawRoom(ctx, ROOM_L_X, oy, ROOM_CONTENTS[(f * ROOMS_PER_FLOOR) % ROOM_CONTENTS.length]);
+      drawRoom(ctx, ROOM_R_X, oy, ROOM_CONTENTS[(f * ROOMS_PER_FLOOR + 1) % ROOM_CONTENTS.length]);
+    }
+    // frame: one wall each side of the shaft (+ outer walls); slabs only over the
+    // room columns so the shaft stays open top-to-bottom.
+    drawFrame(ctx, towerW, towerH, [0, wallL, wallR, towerW - DIV_W],
+              [[0, wallL], [wallR + DIV_W, towerW]]);
+    // elevator car/doors per floor inside the shaft, then doorways into the shaft
+    for (let f = 0; f < FLOORS; f++) {
+      const oy = SLAB_H + f * (CELL_H + SLAB_H);
+      drawElevatorCar(ctx, SHAFT_X, oy);
+      drawDoor(ctx, wallL - 4, oy);                  // left room -> shaft
+      drawDoor(ctx, wallR - 4, oy);                  // right room -> shaft
+    }
+    ctx.drawImage(IMG.light2, SHAFT_X + (SHAFT_W - 14) / 2, SLAB_H + 1); // shaft top light
+  }
+}
+</script>
+</body>
+</html>

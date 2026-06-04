@@ -10,3 +10,7 @@ uvicorn.pid
 uvicorn_*.log
 .vscode/
 .idea/
+
+# Raw purchased Pixel Spaces pack (read-only slicing source; curated slices live
+# under agent_central/static/assets/pixelspaces/). Not needed at runtime.
+assets-source/

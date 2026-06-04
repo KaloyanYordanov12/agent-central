@@ -1,0 +1,275 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Living agents - M1 roam + path</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#11131a; color:#cfd2dc; font-family:'Consolas','JetBrains Mono',monospace; padding:18px 24px; }
+  h1 { font-size:15px; color:#ffb060; margin-bottom:4px; }
+  p.sub { font-size:12px; color:#8b92a4; margin-bottom:14px; max-width:980px; }
+  #stage { background:#0c0d12; border:1px solid #2a2e3a; display:block; }
+  body.cap { padding:0; }
+  body.cap h1, body.cap p.sub { display:none; }
+  body.cap #stage { border:0; }
+</style>
+</head>
+<body>
+  <h1>LIVING AGENTS - M1: one agent roaming + pathing room-to-room via stairs</h1>
+  <p class="sub">Walkable graph = room floors + the 4 stepped staircases + 2 doors. The agent paths room-to-room (Dijkstra), walks the polyline, climbs stairs diagonally, feet on the floor, with a name label that follows it. Locked building unchanged. Real pack NPC art at 2x.</p>
+  <canvas id="stage"></canvas>
+
+<script>
+const params = new URLSearchParams(location.search);
+const S  = +(params.get('s') || 6);
+const HASF = params.has('f');
+const FRAC = parseFloat(params.get('f') || '0');
+const NW = 360, NH = 348, B = 3;
+const WALL_BG='#cd683d', FLOOR_BG='#e6904e', BEAM='#3a281c';
+const ASSET='../agent_central/static/assets/pixelspaces/';
+
+// movement tuning
+const SPEED = 50;     // native px / sec
+const STRIDE = 7;     // px per walk frame
+const PAUSE = 0.8;    // sec at each destination
+const NAME = 'ATLAS';
+
+const SRC = {
+  wall:'walls/wall_warm.png', floor:'walls/floor_warm.png',
+  desk:'furniture/Drawerdesk.png', chair:'furniture/Officechair_blue.png',
+  monitor:'objects/Monitor.png', monitorS:'objects/Monitor_small.png', pc:'objects/PC.png', laptop:'objects/Laptop.png',
+  lamp:'objects/Desk_lamp.png',
+  shelf:'furniture/Bookshelf_1.png', shelf2:'furniture/Bookshelf_2.png',
+  shelfL:'furniture/Shelf_large.png', shelfM:'furniture/Shelf_medium.png',
+  booksO:'objects/Books_outside_1.png', booksO2:'objects/Books_outside_2.png', booksI:'objects/Books_inside_1.png',
+  clip:'objects/Clipboard_wall.png', clip3:'objects/Clipboard_wall_3.png', clip4:'objects/Clipboard_wall_4.png',
+  couchR:'furniture/Couch_large_red.png', couchSredS:'furniture/Couch_small_red_side.png', couchSgreyS:'furniture/Couch_small_grey_side.png',
+  table1:'furniture/Coffee_table_1.png', table2:'furniture/Coffee_table_2.png', stool:'furniture/Stool_red.png',
+  aquarium:'objects/Aquarium.png', radio:'objects/Radio.png',
+  fern:'objects/Flora_fern.png', bush:'objects/Flora_bush.png', snake:'objects/Flora_snake.png', pot:'objects/Flowerpot_medium_red.png',
+  poster5:'objects/Poster_5.png', poster6:'objects/Poster_6.png', poster7:'objects/Poster_7.png', clock:'objects/Clock_1_red.png',
+  agent1:'npc/agent1.png',
+};
+const IMG = {};
+let pending = Object.keys(SRC).length;
+for (const k in SRC) { const im=new Image(); im.onload=()=>{ if(--pending===0) start(); }; im.onerror=()=>console.error('fail',SRC[k]); im.src=ASSET+SRC[k]; IMG[k]=im; }
+
+// ---- LOCKED building (identical to rooms.html, clean furniture, no static agent) ----
+const ROOMS = {
+  CONTROL: { x:70, y:6, w:220, h:64, wall:36, items: [
+    ['monitor',4,2],['monitor',34,2],['monitor',64,2],['monitor',94,2],['monitor',124,2],['monitor',154,2],['monitor',184,2],
+    ['monitor',4,20],['monitor',34,20],['monitor',64,20],['monitor',94,20],['monitor',124,20],['monitor',154,20],['monitor',184,20],
+    ['desk',8,44],['chair',20,36],['laptop',30,30],
+    ['desk',80,44],['chair',92,36],['pc',104,30],
+    ['desk',150,44],['chair',162,36],['laptop',172,30],
+    ['pot',196,52],
+  ]},
+  THINKING: { x:0, y:70, w:175, h:128, wall:72, items: [
+    ['poster5',8,12],['clip',36,12],['clip3',70,12],['clip4',104,12],['poster6',138,12],
+    ['shelfL',40,50],['booksO',48,42],
+    ['chair',50,100],['chair',78,100],['table1',60,108],['stool',100,110],
+    ['fern',8,102],['bush',130,106],['pot',30,116],['snake',146,104],
+  ]},
+  LIBRARY: { x:175, y:70, w:185, h:64, wall:6, items: [
+    ['shelf',60,12],['shelf2',90,12],['shelf',120,12],['shelf2',150,12],
+    ['booksO',72,50],['stool',104,46],['booksO2',136,50],
+  ]},
+  COMMS: { x:175, y:134, w:185, h:64, wall:28, items: [
+    ['clip3',6,2],['clip4',38,2],['clip3',70,2],['clock',98,4],
+    ['desk',8,44],['chair',22,36],['radio',30,30],['booksO',66,50],['booksO2',6,52],
+    ['fern',92,38],['pot',70,52],
+  ]},
+  BROWSE: { x:0, y:198, w:250, h:64, wall:24, items: [
+    ['poster6',80,0],['clock',130,2],['poster7',190,0],
+    ['desk',72,44],['chair',84,36],['monitor',82,28],['pc',112,30],
+    ['desk',130,44],['chair',142,36],['monitor',140,28],['laptop',168,30],
+    ['desk',186,44],['chair',198,36],['monitor',196,28],['pc',224,30],
+  ]},
+  WRITING: { x:250, y:198, w:110, h:64, wall:24, items: [
+    ['poster7',60,0],['shelfM',6,8],['booksI',8,2],
+    ['desk',10,44],['chair',24,36],['lamp',40,28],['booksO',62,50],
+    ['fern',84,38],['pot',66,52],
+  ]},
+  LOUNGE: { x:0, y:262, w:360, h:74, wall:22, items: [
+    ['poster5',12,0],['poster6',70,0],['poster7',130,0],['clock',190,2],['poster6',240,0],
+    ['fern',2,48],['couchSredS',22,46,'F'],['table1',52,54],['couchSgreyS',82,46],['aquarium',112,44],['stool',112,56],['bush',138,52],
+    ['couchR',170,42],['table2',234,54],['couchSgreyS',266,46],
+  ]},
+};
+const STAIRS = [
+  [294, 262, 60, 74, 'L'],   // LOUNGE  -> WRITING floor
+  [  6, 198, 60, 64, 'R'],   // BROWSE  -> THINKING floor
+  [294, 134, 60, 64, 'L'],   // COMMS   -> LIBRARY floor
+  [178,  70, 60, 64, 'R'],   // LIBRARY -> CONTROL floor
+];
+const DOORS = [ [292,262],[66,198],[175,198],[292,134],[250,262],[262,70] ];
+
+function tile(ctx,img,x,y,w,h){ ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
+  for(let ty=y;ty<y+h;ty+=img.height)for(let tx=x;tx<x+w;tx+=img.width)ctx.drawImage(img,tx,ty); ctx.restore(); }
+function drawRoom(ctx,def){ const {x,y,w,h,wall,items}=def; const ix=x+B,iy=y+B,iw=w-2*B,ih=h-2*B;
+  ctx.save();ctx.beginPath();ctx.rect(ix,iy,iw,ih);ctx.clip();
+  ctx.fillStyle=WALL_BG;ctx.fillRect(ix,iy,iw,wall);tile(ctx,IMG.wall,ix,iy,iw,wall);
+  ctx.fillStyle=FLOOR_BG;ctx.fillRect(ix,iy+wall,iw,ih-wall);tile(ctx,IMG.floor,ix,iy+wall,iw,ih-wall);
+  for(const [k,dx,dy,fl] of items){ const im=IMG[k],sw=im.width*2,sh=im.height*2;
+    if(fl==='F'){ctx.save();ctx.translate(ix+dx+sw,iy+dy);ctx.scale(-1,1);ctx.drawImage(im,0,0,sw,sh);ctx.restore();}
+    else ctx.drawImage(im,ix+dx,iy+dy,sw,sh); }
+  ctx.restore(); }
+function staircase(ctx,x,y,w,h,dir){ const n=8,tw=w/n,th=h/n;
+  for(let i=0;i<n;i++){const colH=(i+1)*th,cx=(dir==='R')?x+i*tw:x+(n-1-i)*tw,cy=y+h-colH;
+    ctx.fillStyle='#878b95';ctx.fillRect(cx,cy,tw,colH);
+    ctx.fillStyle='#c6cad4';ctx.fillRect(cx,cy,tw,1.2);
+    ctx.fillStyle='#5c606a';ctx.fillRect((dir==='R')?cx+tw-0.6:cx,cy,0.8,colH);}
+  ctx.fillStyle='#aeb2bc'; const landX=(dir==='R')?x+w-tw*2:x;
+  ctx.fillRect(landX,y-1,tw*2,2); ctx.fillRect(x,y+h-1,w,2); }
+
+// ---- walkable graph: nodes on room floor lines + stair endpoints ----
+const NODE = {
+  LOUNGE_W:[110,333], LOUNGE_S1:[348,333],
+  WRIT:[300,259], L1DOOR:[250,259], BROW_C:[150,259], BROW_S2:[14,259],
+  THIN_S2:[60,195], THIN_C:[95,195], L2DOOR:[175,195], COMM_C:[240,195], COMM_S3:[348,195],
+  LIB_S3:[300,131], LIB_C:[250,131], LIB_S4:[188,131],
+  CTRL_S4:[232,67], CTRL_C:[150,67],
+  // work-station seats (on each room floor line)
+  BROW_SEAT:[93,259], WRIT_SEAT:[280,259], COMM_SEAT:[209,195],
+};
+const LINKS = [
+  ['LOUNGE_W','LOUNGE_S1'],
+  ['LOUNGE_S1','WRIT'],            // stair S1
+  ['WRIT','L1DOOR'],['L1DOOR','BROW_C'],['BROW_C','BROW_S2'],
+  ['BROW_S2','THIN_S2'],           // stair S2
+  ['THIN_S2','THIN_C'],['THIN_C','L2DOOR'],['L2DOOR','COMM_C'],['COMM_C','COMM_S3'],
+  ['COMM_S3','LIB_S3'],            // stair S3
+  ['LIB_S3','LIB_C'],['LIB_C','LIB_S4'],
+  ['LIB_S4','CTRL_S4'],            // stair S4
+  ['CTRL_S4','CTRL_C'],
+  ['BROW_SEAT','BROW_C'],['BROW_SEAT','BROW_S2'],
+  ['WRIT_SEAT','WRIT'],['WRIT_SEAT','L1DOOR'],
+  ['COMM_SEAT','COMM_C'],['COMM_SEAT','L2DOOR'],
+];
+const ADJ = {};
+for (const id in NODE) ADJ[id]=[];
+const dist2=(a,b)=>Math.hypot(NODE[a][0]-NODE[b][0],NODE[a][1]-NODE[b][1]);
+for (const [a,b] of LINKS){ ADJ[a].push(b); ADJ[b].push(a); }
+
+function dijkstra(src,dst){
+  const D={},P={},Q=new Set(Object.keys(NODE));
+  for(const id in NODE) D[id]=Infinity; D[src]=0;
+  while(Q.size){ let u=null,best=Infinity; for(const id of Q) if(D[id]<best){best=D[id];u=id;}
+    if(u===null) break; Q.delete(u); if(u===dst) break;
+    for(const v of ADJ[u]){ const nd=D[u]+dist2(u,v); if(nd<D[v]){D[v]=nd;P[v]=u;} } }
+  const path=[]; let c=dst; while(c!==undefined){ path.unshift(c); if(c===src) break; c=P[c]; }
+  return path;
+}
+
+// STATE = DESTINATION. Each task: path to a function room, sit at its station and
+// work (seated illusion + lit screen + bubble), hold, then get up and go to the next.
+const WORK = 2.4;   // sec working at a station
+const TASKS = [
+  ['BROW_SEAT','BROWSE'],    // perceive  -> lit monitor
+  ['WRIT_SEAT','WRITING'],   // produce   -> lit laptop
+  ['COMM_SEAT','COMMS'],     // communicate -> lit screen (up via the stair)
+];
+// per-seat seated render: desk-front that occludes the legs, the lit device, bubble.
+const SEATS = {
+  BROWSE:  { occ:[['BROWSE',['desk',72,44]]],  light:{type:'mon', x:105,y:229}, bubble:{x:104,y:205} },
+  WRITING: { occ:[['WRITING',['desk',10,44]]], light:{type:'laptop',x:296,y:231}, bubble:{x:296,y:205} },
+  COMMS:   { occ:[['COMMS',['desk',8,44]]],    light:{type:'monS', x:220,y:166}, bubble:{x:214,y:143} },
+};
+
+let SEGS=[], TT=0;
+function buildTimeline(){
+  SEGS=[]; let walked=0;
+  for(let i=0;i<TASKS.length;i++){
+    const cur=TASKS[i], nxt=TASKS[(i+1)%TASKS.length];
+    SEGS.push({kind:'work', seat:cur[1], x:NODE[cur[0]][0], y:NODE[cur[0]][1], dur:WORK, d0:walked});
+    const pts=dijkstra(cur[0],nxt[0]).map(id=>NODE[id]);
+    for(let j=0;j<pts.length-1;j++){
+      const [ax,ay]=pts[j],[bx,by]=pts[j+1]; const len=Math.hypot(bx-ax,by-ay); if(len<0.01) continue;
+      SEGS.push({kind:'walk',ax,ay,bx,by,len,dur:len/SPEED,d0:walked}); walked+=len;
+    }
+  }
+  TT=SEGS.reduce((s,g)=>s+g.dur,0);
+}
+
+function agentAt(t){
+  t=((t%TT)+TT)%TT; let lastFace=false;
+  for(const g of SEGS){
+    if(t<g.dur){
+      if(g.kind==='work') return {x:g.x,y:g.y,working:true,seat:g.seat,faceLeft:lastFace,dist:g.d0};
+      const f=t/g.dur, x=g.ax+(g.bx-g.ax)*f, y=g.ay+(g.by-g.ay)*f;
+      const face=(g.bx-g.ax)<-0.5 ? true : ((g.bx-g.ax)>0.5 ? false : lastFace);
+      return {x,y,walking:true,seat:null,dist:g.d0+g.len*f,faceLeft:face};
+    }
+    t-=g.dur;
+    if(g.kind==='walk') lastFace=(g.bx-g.ax)<-0.5 ? true : ((g.bx-g.ax)>0.5 ? false : lastFace);
+  }
+  return {x:NODE.BROW_SEAT[0],y:NODE.BROW_SEAT[1],working:true,seat:'BROWSE',faceLeft:false,dist:0};
+}
+
+// draw one furniture item at its room's inner origin (used to redraw a desk-front over a seated agent)
+function drawItem(octx,rk,it){ const r=ROOMS[rk],ix=r.x+B,iy=r.y+B; const [k,dx,dy,fl]=it; const im=IMG[k],sw=im.width*2,sh=im.height*2;
+  octx.save();octx.beginPath();octx.rect(ix,iy,r.w-2*B,r.h-2*B);octx.clip();
+  if(fl==='F'){octx.translate(ix+dx+sw,iy+dy);octx.scale(-1,1);octx.drawImage(im,0,0,sw,sh);} else octx.drawImage(im,ix+dx,iy+dy,sw,sh);
+  octx.restore(); }
+function glow(octx,x,y,w,h){ octx.fillStyle='#0b2a2a';octx.fillRect(x,y,w,h);
+  octx.fillStyle='#3fe3cb';octx.fillRect(x+1,y+1,w-2,h-2); octx.fillStyle='#c9fff4';octx.fillRect(x+2,y+2,Math.max(4,w-12),2); }
+function drawLight(octx,L){
+  if(L.type==='mon'){ octx.drawImage(IMG.monitor,L.x,L.y,24,16); glow(octx,L.x+2,L.y+2,20,10); }
+  else if(L.type==='monS'){ octx.drawImage(IMG.monitorS,L.x,L.y,20,16); glow(octx,L.x+2,L.y+2,16,10); }
+  else if(L.type==='laptop'){ octx.drawImage(IMG.laptop,L.x,L.y,20,14); glow(octx,L.x+2,L.y+1,16,7); }
+}
+function drawWorkBubble(octx,bx,by){
+  octx.fillStyle='#11141c';octx.fillRect(bx-1,by-1,20,13); octx.fillStyle='#11141c';octx.fillRect(bx-3,by+13,5,5);
+  octx.fillStyle='#f4f6fb';octx.fillRect(bx,by,18,11); octx.fillStyle='#f4f6fb';octx.fillRect(bx-2,by+12,5,3);octx.fillRect(bx,by+11,3,2);
+  octx.fillStyle='#2bd66f';octx.fillRect(bx+3,by+4,3,3); octx.fillStyle='#9aa2b4';octx.fillRect(bx+8,by+5,2,2);octx.fillRect(bx+12,by+5,2,2);
+}
+
+function drawAgent(ctx,x,y,col,row,faceLeft){
+  const sx=Math.round(x-33), sy=Math.round(y-48);   // feet (opaque bottom y24*2=48) at (x,y)
+  if(faceLeft){ ctx.save();ctx.translate(sx+64,sy);ctx.scale(-1,1);ctx.drawImage(IMG.agent1,col*32,row*32,32,32,0,0,64,64);ctx.restore(); }
+  else ctx.drawImage(IMG.agent1,col*32,row*32,32,32,sx,sy,64,64);
+}
+function drawLabel(ctx,nx,headTopY,name){
+  const cx=nx*S, baseY=headTopY*S-7;
+  ctx.font='bold 11px Consolas'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const w=Math.ceil(ctx.measureText(name).width)+10, h=15, x=cx-w/2, y=baseY-h;
+  ctx.fillStyle='rgba(10,12,18,0.92)'; ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle='rgba(255,176,96,0.55)'; ctx.lineWidth=1; ctx.strokeRect(x+0.5,y+0.5,w-1,h-1);
+  ctx.beginPath(); ctx.moveTo(cx-3,y+h); ctx.lineTo(cx+3,y+h); ctx.lineTo(cx,y+h+4); ctx.closePath();
+  ctx.fillStyle='rgba(10,12,18,0.92)'; ctx.fill();
+  ctx.fillStyle='#ffd9a0'; ctx.fillText(name,cx,y+h/2+0.5);
+}
+
+let off,octx,ctx,T0;
+function frame(){
+  const tsec = HASF ? FRAC*TT : ((performance.now()-T0)/1000);
+  const st = agentAt(tsec);
+  octx.fillStyle=BEAM; octx.fillRect(0,0,NW,NH);
+  for(const k in ROOMS) drawRoom(octx,ROOMS[k]);
+  for(const s of STAIRS) staircase(octx,...s);
+  for(const [x,y] of DOORS){ octx.fillStyle='#14141a'; octx.fillRect(x-2,y-12,4,12); }
+  if(st.working){                                   // seated: agent, then desk-front over legs, then lit device + bubble
+    const seat=SEATS[st.seat];
+    drawAgent(octx, st.x, st.y, 0, 1, st.faceLeft);
+    for(const [rk,it] of seat.occ) drawItem(octx, rk, it);
+    if(seat.light) drawLight(octx, seat.light);
+    drawWorkBubble(octx, seat.bubble.x, seat.bubble.y);
+  } else {
+    const col=Math.floor(st.dist/STRIDE)%4;
+    drawAgent(octx, st.x, st.y, col, 0, st.faceLeft);
+  }
+  ctx.imageSmoothingEnabled=false; ctx.drawImage(off,0,0,NW,NH,0,0,NW*S,NH*S);
+  drawLabel(ctx, st.x, st.y-28, NAME);
+  if(!HASF) requestAnimationFrame(frame);
+}
+function start(){
+  if(HASF) document.body.classList.add('cap');
+  buildTimeline();
+  off=document.createElement('canvas'); off.width=NW; off.height=NH; octx=off.getContext('2d'); octx.imageSmoothingEnabled=false;
+  const c=document.getElementById('stage'); c.width=NW*S; c.height=NH*S; ctx=c.getContext('2d');
+  T0=performance.now();
+  frame();
+}
+</script>
+</body>
+</html>
