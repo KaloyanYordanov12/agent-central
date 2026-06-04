@@ -2,7 +2,7 @@
 
 > A real-time observatory for AI agents at work. Watch your agents like you'd watch your colleagues across the office floor — see what they're doing, when, and where.
 
-![Agent Central: the live office, the metrics dashboard, and REPLAY mode](docs/stage3-build/hero-demo.gif)
+![Agent Central: the live office, the metrics dashboard, and REPLAY mode](docs/stage4-build/hero-demo.gif)
 
 *A live capture of the current build: the live office with the status HUD, ticker and jobs funnel; the metrics dashboard; and REPLAY mode scrubbing through a recorded day.*
 

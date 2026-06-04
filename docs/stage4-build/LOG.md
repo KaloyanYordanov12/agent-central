@@ -52,3 +52,34 @@ hit; record() accrues calls + estimated cost. process_pending_jobs takes an
 optional guard and stops the loop before any call that would breach a cap.
 Unit-tested: each cap triggers; a guard with 0 allowed calls makes ZERO real
 calls; a cap of 2 stops after exactly 2. Full suite: 110 passing.
+
+### Archive + fresh DB
+Archived the old data DB (mostly historical credit-failure data) to
+data/activity-archive-20260604-215010.db (verified: 4729 llm_calls rows,
+non-empty), then started the agents against a fresh empty data/activity.db. Both
+the DB and the archive are gitignored and never committed.
+
+### Live run results (EXACT spend)
+- Job Scout discovery (FREE, no LLM): fetched 116 jobs, stored 86 pending to score.
+- Capped analyst scoring (claude-haiku-4-5) under SpendGuard(max_calls=60,
+  max_cost_usd=$1.00, max_seconds=900): stopped at the 40-successful-score target.
+  EXACT spend: 40 real calls, 0 errors, $0.0797 (guard.cost 0.079687). No hard cap
+  was hit (the target stop fired first; well under 60 calls / $1.00 / 15 min).
+- Then ran 4 additional FREE Job Scout passes (no LLM) to enrich real activity.
+
+### Before / after success rate
+- BEFORE: 137 ok / 4729 calls = 2.9% success (old credit-failure data).
+- AFTER: 40 ok / 40 calls = 100.0% success. 58,889 tokens (48,709 in / 10,180 out),
+  $0.0797 spend, avg latency ~3.7s. Jobs funnel: 86 found, 30 filter-rejected,
+  39 LLM-rejected, 1 scored (72), 46 still pending. Real state durations.
+  The dashboard "LLM calls / day" chart is now all-green (success) instead of red.
+
+### Phase 3: fresh demo on the healthy data
+Re-captured on the refreshed data: s4-dashboard.png (100% success), s4-office.png,
+s4-replay.png. Rebuilt the hero GIF (docs/stage4-build/hero-demo.gif, 29 frames,
+~2.3MB: live office -> healthy dashboard -> replay of the real day) and README
+stills (readme-cold-open/office/dashboard/replay/secretary.png). Pointed the README
+hero at the new asset. Added slower replay speeds (30x/120x default) so the short
+fresh recorded day is watchable on auto-play. README claims kept honest (the live
+demo server runs keyless, so the HUD honestly shows the analyst paused; the
+dashboard + replay show the healthy recorded run).
