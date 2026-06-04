@@ -379,7 +379,9 @@
     /* A4 honest offline / reconnecting banner (calm, never alarming red) */
     .offline-banner {
       position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 880;
-      max-width: 620px; background: rgba(20, 24, 32, 0.92);
+      /* Center lane only: never reach the left HUD (~250px) or the right stack
+         (~250px), so it cannot overlap them at any common window width. */
+      max-width: min(560px, calc(100vw - 540px)); background: rgba(20, 24, 32, 0.92);
       border: 1px solid rgba(255, 176, 0, 0.4); border-radius: 20px;
       padding: 6px 15px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px;
       color: #ffd27a; display: flex; align-items: center; gap: 9px;
@@ -392,8 +394,16 @@
     .offline-banner.reconnecting .ob-dot { background: #ffb000; animation: tk-pulse 1.2s ease-in-out infinite; }
 
     /* D3 jobs funnel — live pipeline counts (read-only) */
+    /* Cost chip: fixed top-right, above the funnel; matches the console panels */
+    #cost-today-indicator {
+      position: fixed; top: 14px; right: 14px; z-index: 851; width: 218px;
+      box-sizing: border-box; text-align: right;
+      font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #f4f0e0;
+      background: rgba(10, 12, 18, 0.9); border: 1px solid rgba(255, 176, 0, 0.3);
+      padding: 6px 10px; border-radius: 6px; pointer-events: none;
+    }
     .jobs-funnel {
-      position: fixed; top: 14px; right: 14px; z-index: 850; width: 218px;
+      position: fixed; top: 66px; right: 14px; z-index: 850; width: 218px;
       background: rgba(10, 12, 18, 0.9); border: 1px solid rgba(255, 176, 0, 0.3);
       border-radius: 6px; padding: 8px 10px 9px;
       font-family: 'JetBrains Mono', monospace; color: #ffce5c;
@@ -421,16 +431,11 @@
       <div class="building-sign">AGENT CENTRAL</div>
       <div id="game-container"></div>
 
-      <!-- Cost Today indicator (commit 2b): running LLM spend, polled every 60s -->
-      <div id="cost-today-indicator"
-           style="position: absolute; top: 8px; right: 8px;
-                  font-family: 'JetBrains Mono', monospace; font-size: 10px;
-                  color: #f4f0e0; background: rgba(36, 56, 69, 0.85);
-                  padding: 4px 8px; border-radius: 3px; pointer-events: none; z-index: 10;">
-        LLM today: --
-      </div>
     </div>
   </div>
+
+  <!-- Cost Today indicator: running LLM spend (fixed top-right, above the funnel) -->
+  <div id="cost-today-indicator">LLM today: --</div>
 
   <div class="popup" id="popup" style="display: none;">
     <button class="popup-close" id="popup-close">×</button>
