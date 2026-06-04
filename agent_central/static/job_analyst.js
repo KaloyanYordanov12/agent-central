@@ -59,13 +59,22 @@
     return escapeHtml(label);  // refuse non-http(s) schemes (e.g. javascript:)
   }
 
-  function renderScores(scores) {
+  function pausedBanner(meta) {
+    if (!meta || !meta.paused) return "";
+    const reason = escapeHtml((meta.pause_reason || "misconfigured").replace(/\.\s*$/, ""));
+    return '<div class="ja-paused"><b>Analyst paused.</b> ' + reason +
+      '. Scoring is off until this is resolved and the server restarts. ' +
+      '(Set <code>ANTHROPIC_API_KEY</code> to score jobs; the rest of the office works without it.)</div>';
+  }
+
+  function renderScores(scores, meta) {
     const list = $("ja-scores-list");
+    const banner = pausedBanner(meta);
     if (!scores || scores.length === 0) {
-      list.innerHTML = '<div class="sec-muted">No jobs scored yet.</div>';
+      list.innerHTML = banner + '<div class="sec-muted">No jobs scored yet.</div>';
       return;
     }
-    list.innerHTML = scores.map((s) => {
+    list.innerHTML = banner + scores.map((s) => {
       const badge = '<span class="job-score-badge ' + scoreClass(s.score) + '">' +
         escapeHtml(s.score) + "</span>";
       const notified = s.notified ? ' &middot; <span class="sec-state">notified</span>' : "";
@@ -97,7 +106,7 @@
     fetch("/api/jobs/analyst-activity?limit=50")
       .then((r) => { if (!r.ok) throw new Error("http " + r.status); return r.json(); })
       .then((data) => {
-        renderScores(data.recent_scores || []);
+        renderScores(data.recent_scores || [], data);
         renderSummary(data.summary || {});
       })
       .catch((err) => {

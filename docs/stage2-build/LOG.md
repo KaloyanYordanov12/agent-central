@@ -156,3 +156,17 @@ the architecture diagram; and rewrote the design-notes section to describe the
 real always-on legibility and honest-degradation behavior. No em-dashes added
 (the dozen pre-existing ones live in sections I did not touch).
 
+### F3 better empty / error states (shipped)
+
+- Ask Secretary tab: a friendly empty state before any question (two example
+  questions) plus clear messaging that the answer uses Claude Haiku and needs
+  `ANTHROPIC_API_KEY` on the server, while the History tab works with no key. The
+  hint clears on the first question.
+- Job Analyst popup: when the analyst is paused (from the F4 `paused`/`pause_reason`
+  now on `/api/jobs/analyst-activity`), a parchment notice explains it is paused
+  and what to set, so a viewer without a key understands what the analyst would do.
+  Verified both live. Screenshots: `f3-ask-empty.png`, `f3-analyst-zoom.png`.
+
+Note: scripted screenshots now disable the browser cache (Network.setCacheDisabled)
+so freshly edited static JS/CSS is always captured.
+
