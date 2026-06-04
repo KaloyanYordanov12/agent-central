@@ -22,3 +22,11 @@ Removed the in-world terminal pill (HTML element, CSS, and its click handler). T
 upper-floor Control screens still open the same metrics dashboard via the canvas
 hitControl click path. Verified: terminal element is gone, and a synthetic click on
 the Control screens opens the dashboard. Screenshot: p1-1-terminal-removed.png.
+
+### P1.2 dismissible offline banner
+Added a clear (x) close control to the offline/reconnecting banner. Dismissal is
+keyed on a signature of the exact condition (which agents are offline, or
+"reconnecting"): a dismissed signature stays closed across polls, but a genuinely
+new condition (a different agent going offline, or the set changing) shows it
+again. Verified: the banner shows a close button, and after dismissing it stays
+hidden across a 4s poll cycle. Screenshot: p1-2-banner.png.

@@ -409,6 +409,13 @@
       background: #9aa2b4; flex: none; }
     .offline-banner.reconnecting { border-color: #ffb000; }
     .offline-banner.reconnecting .ob-dot { background: #ffb000; animation: tk-pulse 1.2s ease-in-out infinite; }
+    .offline-banner .ob-close {
+      flex: none; margin-left: 4px; width: 18px; height: 18px; line-height: 1;
+      border-radius: 50%; cursor: pointer; font-family: inherit; font-size: 13px;
+      font-weight: 700; color: #ffd27a; background: transparent;
+      border: 1px solid rgba(255, 176, 0, 0.4); padding: 0;
+    }
+    .offline-banner .ob-close:hover { background: rgba(255, 176, 0, 0.18); }
 
     /* D3 jobs funnel — live pipeline counts (read-only) */
     /* Cost chip: fixed top-right, above the funnel; matches the console panels */
@@ -529,6 +536,7 @@
   <!-- A4 honest offline / reconnecting banner (only shows when something is down) -->
   <div class="offline-banner hidden" id="offline-banner">
     <span class="ob-dot"></span><span id="ob-text"></span>
+    <button class="ob-close" id="ob-close" aria-label="Dismiss">&times;</button>
   </div>
 
   <!-- A1 cold-open onboarding card: what this is, that it is real, click anything -->
@@ -1397,36 +1405,49 @@
                       job_analyst: 'Job Analyst', secretary: 'Secretary' };
       const banner = document.getElementById('offline-banner');
       const textEl = document.getElementById('ob-text');
+      const closeBtn = document.getElementById('ob-close');
       if (!banner) return;
 
-      function setBanner(mode, text) {
-        if (!mode) { banner.classList.add('hidden'); return; }
+      // A banner is dismissible. We key dismissal on a signature of the exact
+      // condition (which agents are offline, or "reconnecting"); a dismissed
+      // signature stays closed, but a genuinely new condition (a different agent
+      // going offline, or the set changing) shows it again.
+      let currentSig = null, dismissedSig = null;
+
+      function show(mode, text) {
         banner.classList.remove('hidden');
         banner.classList.toggle('reconnecting', mode === 'reconnecting');
         textEl.textContent = text;
       }
+      function hide() { banner.classList.add('hidden'); }
 
       function offlineAgents() {
         const live = window.AGENT_LIVE || {};
         return Object.keys(live).filter((id) => (live[id] || {}).state === 'offline');
       }
 
+      function present(sig, mode, text) {
+        currentSig = sig;
+        if (sig === dismissedSig) { hide(); return; }  // already dismissed for this state
+        show(mode, text);
+      }
+
       function tick() {
         fetch('/health', { cache: 'no-store' })
           .then((r) => { if (!r.ok) throw new Error('bad'); return r.json(); })
           .then(() => {
-            // Observatory is reachable. Only an external agent service may be down.
             const off = offlineAgents();
-            if (!off.length) { setBanner(null); return; }
-            const names = off.map((id) => NAMES[id] || id).join(', ');
-            const who = off.length === 1 ? (names + ' is offline') : (names + ' are offline');
-            setBanner('offline', who + ': that scanner runs as a separate service. The rest of the office is live.');
+            if (!off.length) { currentSig = null; dismissedSig = null; hide(); return; }
+            const ids = off.slice().sort();
+            const names = ids.map((id) => NAMES[id] || id).join(', ');
+            const who = ids.length === 1 ? (names + ' is offline') : (names + ' are offline');
+            present('offline:' + ids.join(','), 'offline',
+                    who + ': that scanner runs as a separate service. The rest of the office is live.');
           })
-          .catch(() => {
-            // The observatory itself is unreachable: reconnecting, not broken.
-            setBanner('reconnecting', 'Reconnecting to the live feed...');
-          });
+          .catch(() => present('reconnecting', 'reconnecting', 'Reconnecting to the live feed...'));
       }
+
+      if (closeBtn) closeBtn.addEventListener('click', () => { dismissedSig = currentSig; hide(); });
       tick();
       setInterval(tick, 4000);
     })();
