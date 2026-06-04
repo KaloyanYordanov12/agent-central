@@ -710,8 +710,11 @@
       let ws = new WebSocket(`${wsProto}//${location.host}/ws/status`);
       ws.onopen = ()=>console.log('[WS] connected');
       ws.onmessage = (event)=>{ try{ const msg=JSON.parse(event.data);
-        if(msg.type==='status' && msg.payload && msg.payload.agent_id){ setBackendState(msg.payload.agent_id, msg.payload.state); }
+        if(msg.type==='status' && msg.payload && msg.payload.agent_id){
+          AGENT_LIVE[msg.payload.agent_id]={state:msg.payload.state, action:msg.payload.current_action};
+          setBackendState(msg.payload.agent_id, msg.payload.state); }
         else if(msg.type==='agent_states' && msg.agents){
+          for(const id in msg.agents){ const s=msg.agents[id]||{}; AGENT_LIVE[id]={state:s.state, action:s.current_action}; }
           if(msg.agents.deal_hunter) setBackendState('deal_hunter', msg.agents.deal_hunter.state);
           if(msg.agents.job_scout)   jobScoutWalker.setState(msg.agents.job_scout.state);
           if(msg.agents.job_analyst) jobAnalystWalker.setState(msg.agents.job_analyst.state);
@@ -734,16 +737,81 @@
       for(const ag of AGENTS){ const d=Math.hypot(ag.x-nx, (ag.y-14)-ny); if(d<bd){ bd=d; best=ag; } }
       return best;
     }
+    // ---- interactivity: agents, flavor objects, control stats ----
+    const AGENT_LIVE = {};                                  // latest {state,action} per agent from WS
+    const POPUP_FN = { job_scout:'openJobScoutPopup', job_analyst:'openJobAnalystPopup', secretary:'openSecretaryPopup' };
+    function showInfo(title, body, cx, cy){
+      const POP=document.getElementById('popup'), POPC=document.getElementById('popup-content');
+      POPC.innerHTML=(title?'<div class="popup-title">'+title+'</div>':'')+body; POP.style.display='block';
+      const w=POP.offsetWidth||280, h=POP.offsetHeight||160;
+      let x=(cx||innerWidth/2)+16, y=(cy||innerHeight/2)-h/2;
+      if(x+w>innerWidth-10) x=(cx||innerWidth/2)-w-16;
+      x=Math.max(10,Math.min(x,innerWidth-w-10)); y=Math.max(10,Math.min(y,innerHeight-h-10));
+      POP.style.left=x+'px'; POP.style.top=y+'px';
+    }
+    function hideInfo(){ const POP=document.getElementById('popup'); if(POP) POP.style.display='none'; }
+
+    // Clickable flavor objects (native-pixel rects over the locked furniture).
+    const ITEMS = [
+      {x:112,y:305,w:26,h:18, t:'AQUARIUM', b:"One fish. Goes by Larry.\nLarry is the only one here not on a deadline.\nWe suspect he is load-bearing for morale."},
+      {x:173,y:305,w:60,h:28, t:'THE NAP COUCH', b:"Structural support for the whole operation.\nCushion #2 still holds the shape of a 3-hour 'quick sync'.\nNo agent admits to napping here. All of them do."},
+      {x:236,y:84,w:108,h:48, t:'THE ARCHIVES', b:"Wall-to-wall institutional memory.\n90% outdated runbooks, 10% load-bearing.\nThe Job Analyst swears it read all of them. It did not."},
+      {x:10,y:95,w:160,h:40, t:'THINKING BOARDS', b:"Current diagram: an arrow pointing at another arrow.\nSomeone wrote 'SYNERGY?' and crossed it out.\nWhere the hard problems come to be stared at."},
+      {x:204,y:163,w:26,h:20, t:'DISPATCH RADIO', b:"Tuned between smooth jazz and a confused taxi company.\nThe volume knob does nothing. It is decorative.\nLike most meetings."},
+      {x:274,y:139,w:24,h:24, t:'THE CLOCK', b:"Tells time the way the agents track deadlines: loosely.\nIt is always almost 5.\nIt has never once actually been 5."},
+      {x:131,y:201,w:24,h:24, t:'THE CLOCK', b:"Tells time the way the agents track deadlines: loosely.\nIt is always almost 5.\nIt has never once actually been 5."},
+      {x:139,y:314,w:26,h:20, t:'OFFICE PLANT', b:"Low-maintenance morale.\nWatered by optimism and the occasional spilled coffee.\nQuietly outperforming several KPIs."},
+    ];
+    function hitItem(nx,ny){ for(const it of ITEMS){ if(nx>=it.x&&nx<=it.x+it.w&&ny>=it.y&&ny<=it.y+it.h) return it; } return null; }
+    // CONTROL screen-wall region (the two rows of monitors) -> live stats.
+    const CTRL_RECT={x:77,y:11,w:204,h:36};
+    function hitControl(nx,ny){ return nx>=CTRL_RECT.x&&nx<=CTRL_RECT.x+CTRL_RECT.w&&ny>=CTRL_RECT.y&&ny<=CTRL_RECT.y+CTRL_RECT.h; }
+
+    const ROOM_LABEL={BROWSE:'Browse',THINKING:'Thinking',LIBRARY:'Library',WRITING:'Writing',COMMS:'Comms',LOUNGE:'Lounge'};
+    const DH_STATE_LABEL={scanning:'Scanning for leads',qualifying:'Qualifying a lead',author_research:'Researching the author',writing:'Writing a draft',critic:'Reviewing the draft',posting:'Posting',idle:'Idle',offline:'Offline'};
+    function showDealHunter(cx,cy){
+      const L=AGENT_LIVE.deal_hunter||{}; const st=L.state||'idle';
+      const lbl=DH_STATE_LABEL[st]||st;
+      const room=(st==='offline')?'off-site':(st==='idle'?'roaming the floors':(ROOM_LABEL[STATE_TO_ZONE[st]]||'roaming the floors'));
+      let b="Scout, qualify, research, write, post.\nThe outreach pipeline, end to end.\n\nNow: "+lbl+"  ("+room+")";
+      if(L.action) b+='\n"'+L.action+'"';
+      else if(st==='idle') b+="\nLurking, ready for the next lead.";
+      else if(st==='offline') b+="\nOut in the wider web. Back shortly.";
+      showInfo('DEAL HUNTER', b, cx, cy);
+    }
+    function showControlStats(cx,cy){
+      showInfo('CONTROL · LIVE STATS', '<span class="sec-muted">reading the wall...</span>', cx, cy);
+      fetch('/api/llm-costs/today').then(r=>r.ok?r.json():null).then(d=>{
+        const POPC=document.getElementById('popup-content');
+        if(!d){ POPC.innerHTML='<div class="popup-title">CONTROL · LIVE STATS</div><span class="sec-error">stats unavailable</span>'; return; }
+        const usd=(d.total_usd||0).toFixed(4); let b='LLM spend today: $'+usd+'\nCalls logged: '+(d.call_count||0)+'\nDate (UTC): '+(d.date||'-');
+        const ba=d.by_agent||{}, ak=Object.keys(ba);
+        if(ak.length) b+='\n\nBy agent:\n'+ak.map(k=>'  '+k+': $'+(+ba[k]).toFixed(4)).join('\n');
+        const bm=d.by_model||{}, mk=Object.keys(bm);
+        if(mk.length) b+='\n\nBy model:\n'+mk.map(k=>'  '+k+': $'+(+bm[k]).toFixed(4)).join('\n');
+        if(!ak.length) b+='\n\n(No LLM calls logged today yet. The ticker is\nwatching, though.)';
+        POPC.innerHTML='<div class="popup-title">CONTROL · LIVE STATS</div>'+b;
+      }).catch(()=>{ const POPC=document.getElementById('popup-content'); POPC.innerHTML='<div class="popup-title">CONTROL · LIVE STATS</div><span class="sec-error">stats unavailable</span>'; });
+    }
+
     function start(){
       const host=document.getElementById('game-container'); host.innerHTML='';
       view=document.createElement('canvas'); view.id='living-canvas'; view.width=NW*S; view.height=NH*S;
       view.style.display='block'; view.style.cursor='default';
       host.appendChild(view); vctx=view.getContext('2d');
       off=document.createElement('canvas'); off.width=NW; off.height=NH; octx=off.getContext('2d'); octx.imageSmoothingEnabled=false;
-      const popups={ job_scout:'openJobScoutPopup', job_analyst:'openJobAnalystPopup', secretary:'openSecretaryPopup' };
-      view.addEventListener('click',(e)=>{ const r=view.getBoundingClientRect(); const ag=hitTest(e.clientX-r.left, e.clientY-r.top);
-        if(ag && popups[ag.id] && window[popups[ag.id]]) window[popups[ag.id]](); });
-      view.addEventListener('mousemove',(e)=>{ const r=view.getBoundingClientRect(); const ag=hitTest(e.clientX-r.left, e.clientY-r.top); view.style.cursor=(ag&&popups[ag.id])?'pointer':'default'; });
+      view.addEventListener('click',(e)=>{ const r=view.getBoundingClientRect(); const mx=e.clientX-r.left, my=e.clientY-r.top;
+        const ag=hitTest(mx,my);
+        if(ag){ hideInfo(); if(ag.id==='deal_hunter') showDealHunter(e.clientX,e.clientY); else if(window[POPUP_FN[ag.id]]) window[POPUP_FN[ag.id]](); return; }
+        const nx=mx/S, ny=my/S;
+        if(hitControl(nx,ny)){ showControlStats(e.clientX,e.clientY); return; }
+        const it=hitItem(nx,ny); if(it){ showInfo(it.t,it.b,e.clientX,e.clientY); return; }
+        hideInfo();
+      });
+      view.addEventListener('mousemove',(e)=>{ const r=view.getBoundingClientRect(); const mx=e.clientX-r.left, my=e.clientY-r.top;
+        const over = hitTest(mx,my) || hitControl(mx/S,my/S) || hitItem(mx/S,my/S); view.style.cursor = over?'pointer':'default'; });
+      const closeBtn=document.getElementById('popup-close'); if(closeBtn) closeBtn.addEventListener('click', hideInfo);
+      document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') hideInfo(); });
       // glow hooks used by the popup helper scripts
       window.setSecretaryGlow=(on)=>{ if(byId.secretary) byId.secretary.glow=!!on; };
       window.setJobScoutGlow=(on)=>{ if(byId.job_scout) byId.job_scout.glow=!!on; };
