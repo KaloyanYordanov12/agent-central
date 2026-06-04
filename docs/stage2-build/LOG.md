@@ -104,3 +104,14 @@ Honesty fix folded in: the analyst's F4 pause is now logged as a `state_change`
 Deal Hunter Offline, Job Scout Idle, Job Analyst Paused (misconfigured), Secretary
 Idle. Full suite 101 passed. Screenshot: `a3-hud-zoom.png`.
 
+### A2 room labels + zone legend (shipped)
+
+Taste call from IMPROVEMENTS.md resolved the safe way: a clean HTML overlay, NOT
+text baked into the locked pixel-art canvas. A small script reads the engine's
+`window.ROOMS` rects and drops an unobtrusive label tab at the top-center of each
+room (Control, Thinking, Library, Comms, Browse, Writing, Lounge). The labels are
+children of `.building` so they track it wherever it centers, and are
+`pointer-events:none` so clicks still reach the canvas. A compact bottom-left
+"Zones" legend maps each room to its pipeline meaning (Browse: scanning the web,
+Thinking: LLM analysis, etc.). Screenshots: `a2-full.png`, `a2-building.png`.
+

@@ -322,6 +322,26 @@
     .sh-dot.s-error  { background: #ff3030; color: #ff3030; }
     .sh-dot.s-paused { background: #ff8a4c; color: #ff8a4c; }
     .sh-dot.s-wait   { background: #3a3f4b; color: #3a3f4b; box-shadow: none; }
+
+    /* A2 room labels (overlay, not baked into the canvas) + zone legend */
+    .room-label {
+      position: absolute; transform: translateX(-50%); z-index: 6; pointer-events: none;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase; color: #fff3d8;
+      background: rgba(20, 24, 32, 0.62); border: 1px solid rgba(255, 176, 0, 0.28);
+      padding: 1px 6px; border-radius: 3px; white-space: nowrap;
+    }
+    .zone-legend {
+      position: fixed; left: 14px; bottom: 42px; z-index: 850; width: 214px;
+      background: rgba(10, 12, 18, 0.9); border: 1px solid rgba(255, 176, 0, 0.3);
+      border-radius: 6px; padding: 8px 10px;
+      font-family: 'JetBrains Mono', monospace; color: #ffce5c; font-size: 10.5px;
+    }
+    .zone-legend h3 { font-size: 10px; letter-spacing: 2px; color: rgba(255,176,0,0.6);
+      margin: 0 0 6px; font-weight: 700; text-transform: uppercase; }
+    .zone-legend .zl { display: flex; gap: 7px; padding: 1.5px 0; line-height: 1.3; }
+    .zone-legend .zl b { color: #fff3d8; font-weight: 700; min-width: 56px; }
+    .zone-legend .zl span { color: rgba(244, 240, 224, 0.72); }
   </style>
 </head>
 <body>
@@ -345,6 +365,18 @@
   <div class="popup" id="popup" style="display: none;">
     <button class="popup-close" id="popup-close">×</button>
     <div class="popup-content" id="popup-content"></div>
+  </div>
+
+  <!-- A2 zone legend: what each room means in the agent pipeline -->
+  <div class="zone-legend" id="zone-legend">
+    <h3>Zones</h3>
+    <div class="zl"><b>Control</b><span>live ops &amp; stats</span></div>
+    <div class="zl"><b>Browse</b><span>scanning the web</span></div>
+    <div class="zl"><b>Thinking</b><span>LLM analysis</span></div>
+    <div class="zl"><b>Library</b><span>researching</span></div>
+    <div class="zl"><b>Writing</b><span>drafting</span></div>
+    <div class="zl"><b>Comms</b><span>posting &amp; replying</span></div>
+    <div class="zl"><b>Lounge</b><span>idle / off-shift</span></div>
   </div>
 
   <!-- A3 always-on live status HUD: one row per agent, driven by live WS state -->
@@ -817,6 +849,7 @@
     // ---- interactivity: agents, flavor objects, control stats ----
     const AGENT_LIVE = {};                                  // latest {state,action} per agent from WS
     window.AGENT_LIVE = AGENT_LIVE;                          // exposed for the live-status HUD (A3)
+    window.ROOMS = ROOMS; window.SCALE = S;                  // exposed for the room-label overlay (A2)
     const POPUP_FN = { job_scout:'openJobScoutPopup', job_analyst:'openJobAnalystPopup', secretary:'openSecretaryPopup' };
     function showInfo(title, body, cx, cy){
       const POP=document.getElementById('popup'), POPC=document.getElementById('popup-content');
@@ -1060,6 +1093,39 @@
       }
       render();
       setInterval(render, 1000);
+    })();
+  </script>
+
+  <script>
+    // ===================================================================
+    // A2 ROOM LABELS — a clean HTML overlay over each room (NOT baked into the
+    // locked pixel-art canvas, to avoid coordinate risk). Positioned from the
+    // engine's ROOMS rects so labels track the building wherever it is centered.
+    // ===================================================================
+    (function () {
+      "use strict";
+      const LABELS = {
+        CONTROL: 'Control', THINKING: 'Thinking', LIBRARY: 'Library',
+        COMMS: 'Comms', BROWSE: 'Browse', WRITING: 'Writing', LOUNGE: 'Lounge',
+      };
+      function place() {
+        const rooms = window.ROOMS, S = window.SCALE || 2;
+        const building = document.querySelector('.building');
+        if (!rooms || !building) { setTimeout(place, 200); return; }
+        for (const key in LABELS) {
+          const r = rooms[key];
+          if (!r) continue;
+          const el = document.createElement('div');
+          el.className = 'room-label';
+          el.textContent = LABELS[key];
+          el.style.left = ((r.x + r.w / 2) * S) + 'px';
+          el.style.top = ((r.y + 3) * S) + 'px';
+          building.appendChild(el);
+        }
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', place);
+      } else { place(); }
     })();
   </script>
 
