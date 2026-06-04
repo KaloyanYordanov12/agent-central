@@ -101,3 +101,13 @@ clean separation: while window.__replayActive the live WS handler ignores live
 messages; replay only ever plays REAL recorded states (never fabricated); Exit
 returns to live. Verified: scrubbing moves the replayed clock across 2026-06-03/04
 and the office re-enacts. Screenshots: f2c-replay.png, f2c-replay-bar.png.
+
+### Phase 2D: ambient polish (tasteful, low-risk)
+Restyled the building marquee into a mounted "AGENT CENTRAL" plate (console palette,
+amber border + text + corner bolts) and made it actually visible at the roofline;
+moved the offline banner down to 52px so the two never collide. Grounded the
+building with a soft drop shadow. Added a day/night tint: a low-alpha overlay over
+the world (z-index below all UI) tied to the real local clock (night/dawn/midday/
+golden-hour/dusk), so the scene subtly reflects the time without hurting the Stage 2
+legibility. No canvas-internals or building-rescale changes (B1 stays out of scope).
+Screenshots: f2d-full.png, f2d-marquee.png.

@@ -68,35 +68,40 @@
       display: inline-block;
     }
 
+    /* Mounted marquee on the building roof: console palette + amber accent + bolts */
     .building-sign {
       position: absolute;
-      top: -60px;
+      top: -34px;
       left: 50%;
       transform: translateX(-50%);
-      background: #2d4a5c;
-      color: #f4f0e0;
+      background: linear-gradient(#141821, #0d1017);
+      color: #ffd27a;
       font-family: 'JetBrains Mono', monospace;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 700;
-      letter-spacing: 2px;
-      padding: 8px 24px;
-      border: 2px solid #1a3445;
-      border-radius: 2px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      letter-spacing: 3px;
+      padding: 6px 26px;
+      border: 1px solid #ffb000;
+      border-radius: 4px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5), 0 0 14px rgba(255, 176, 0, 0.18);
       white-space: nowrap;
       z-index: 10;
     }
+    /* mounting bolts at the corners */
     .building-sign::before,
     .building-sign::after {
       content: '';
       position: absolute;
-      bottom: -22px;
-      width: 3px;
-      height: 22px;
-      background: #555;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #ffb000;
+      opacity: 0.7;
     }
-    .building-sign::before { left: 20%; }
-    .building-sign::after  { right: 20%; }
+    .building-sign::before { left: 7px; }
+    .building-sign::after  { right: 7px; }
 
     #game-container {
       line-height: 0;
@@ -106,6 +111,15 @@
       image-rendering: pixelated;
       image-rendering: -moz-crisp-edges;
       image-rendering: crisp-edges;
+      /* ground the building in the world */
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.35);
+    }
+
+    /* Day/night tint: a subtle overlay over the world (below all UI), tied to the
+       real local clock. Kept low-alpha so it never hurts readability. */
+    .world-tint {
+      position: fixed; inset: 0; z-index: 800; pointer-events: none;
+      transition: background 4s linear;
     }
 
     /* Parchment quest-screen popup for clickable office elements (F.2b tune) */
@@ -381,7 +395,7 @@
 
     /* A4 honest offline / reconnecting banner (calm, never alarming red) */
     .offline-banner {
-      position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 880;
+      position: fixed; top: 52px; left: 50%; transform: translateX(-50%); z-index: 880;
       /* Center lane only: never reach the left HUD (~250px) or the right stack
          (~250px), so it cannot overlap them at any common window width. */
       max-width: min(560px, calc(100vw - 540px)); background: rgba(20, 24, 32, 0.92);
@@ -501,6 +515,7 @@
 </head>
 <body>
 
+  <div class="world-tint" id="world-tint"></div>
   <div class="world-wrapper">
     <div class="building">
       <div class="building-sign">AGENT CENTRAL</div>
@@ -1622,6 +1637,36 @@
       }, 100);
 
       window.__enterReplay = enter; window.__exitReplay = exit;  // for verification
+    })();
+  </script>
+
+  <script>
+    // ===================================================================
+    // D ambient polish: a subtle day/night tint over the world, tied to the real
+    // local clock. Low alpha so it never fights the Stage 2 legibility work.
+    // ===================================================================
+    (function () {
+      "use strict";
+      const tint = document.getElementById('world-tint');
+      if (!tint) return;
+      function paint() {
+        const h = new Date().getHours();
+        let bg;
+        if (h >= 21 || h < 5) {            // night
+          bg = 'linear-gradient(180deg, rgba(8,14,40,0.34) 0%, rgba(6,10,28,0.22) 100%)';
+        } else if (h < 8) {                // dawn
+          bg = 'linear-gradient(180deg, rgba(255,150,90,0.14) 0%, rgba(120,120,180,0.10) 100%)';
+        } else if (h < 17) {               // midday: almost nothing
+          bg = 'linear-gradient(180deg, rgba(255,250,235,0.04) 0%, rgba(255,255,255,0.0) 100%)';
+        } else if (h < 19) {               // golden hour
+          bg = 'linear-gradient(180deg, rgba(255,170,70,0.16) 0%, rgba(255,120,80,0.10) 100%)';
+        } else {                           // dusk
+          bg = 'linear-gradient(180deg, rgba(60,40,90,0.24) 0%, rgba(20,20,55,0.18) 100%)';
+        }
+        tint.style.background = bg;
+      }
+      paint();
+      setInterval(paint, 5 * 60 * 1000);   // re-evaluate every 5 minutes
     })();
   </script>
 
