@@ -425,6 +425,45 @@
     .jf-scored { background: #2e8a3e; }
     .jf-notified { background: #2bd66f; }
     .jf-empty { font-size: 10.5px; color: rgba(244,240,224,0.55); }
+
+    /* In-world "Live metrics" terminal affordance over the Control screens (B) */
+    .metrics-terminal {
+      position: absolute; z-index: 7; cursor: pointer;
+      transform: translateX(-50%);
+      font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+      letter-spacing: 1px; color: #11151d; background: #ffce5c;
+      border: 1px solid #ffb000; padding: 3px 9px; border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4); white-space: nowrap;
+      animation: term-pulse 2.4s ease-in-out infinite;
+    }
+    .metrics-terminal:hover { background: #fff3d8; }
+    @keyframes term-pulse { 0%,100%{ box-shadow:0 2px 8px rgba(0,0,0,0.4);} 50%{ box-shadow:0 0 12px rgba(255,176,0,0.8);} }
+
+    /* B metrics dashboard (Tier 1 console). Reuses the dark modal shell, wider. */
+    .dash-content { width: 940px !important; height: 86vh !important; max-height: 680px !important; }
+    .dash-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; }
+    .dash-sub { color: rgba(255,176,0,0.5); font-size: 10.5px; margin: -2px 0 12px; }
+    .kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 14px; }
+    .kpi { background: #11151d; border: 1px solid rgba(255,176,0,0.2); border-radius: 8px; padding: 9px 10px; }
+    .kpi .kv { font-size: 19px; font-weight: 700; color: #ffd27a; line-height: 1.1; }
+    .kpi .kl { font-size: 9.5px; color: rgba(244,240,224,0.55); text-transform: uppercase; letter-spacing: 1px; margin-top: 3px; }
+    .kpi .ksub { font-size: 10px; color: rgba(244,240,224,0.5); margin-top: 2px; }
+    .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .dash-card { background: #11151d; border: 1px solid rgba(255,176,0,0.2); border-radius: 8px; padding: 11px 13px; }
+    .dash-card.wide { grid-column: 1 / -1; }
+    .dash-card h4 { font-size: 10.5px; letter-spacing: 1.5px; text-transform: uppercase;
+      color: rgba(255,176,0,0.6); margin: 0 0 9px; font-weight: 700; }
+    .dash-cap { display: flex; justify-content: space-between; font-size: 9.5px; color: rgba(244,240,224,0.45); margin-top: 4px; }
+    .dt { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .dt th { text-align: left; color: rgba(255,176,0,0.5); font-weight: 600; padding: 3px 6px; border-bottom: 1px solid rgba(255,176,0,0.15); }
+    .dt td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #f4f0e0; }
+    .dt td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .dt .agdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .sd-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 11px; }
+    .sd-label { width: 168px; flex: none; color: #f4f0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sd-bar { flex: 1; height: 9px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+    .sd-fill { height: 100%; background: #5fd0ff; border-radius: 3px; }
+    .sd-val { width: 84px; flex: none; text-align: right; color: rgba(244,240,224,0.7); font-variant-numeric: tabular-nums; }
   </style>
 </head>
 <body>
@@ -433,6 +472,9 @@
     <div class="building">
       <div class="building-sign">AGENT CENTRAL</div>
       <div id="game-container"></div>
+      <!-- B: discoverable in-world terminal over the Control screens -> dashboard -->
+      <div class="metrics-terminal" id="metrics-terminal" style="left:360px; top:120px;"
+           title="Open the live metrics dashboard">&#9638; LIVE METRICS</div>
 
     </div>
   </div>
@@ -491,6 +533,20 @@
   <div class="activity-ticker" id="activity-ticker" aria-label="Live agent activity">
     <span class="tk-label"><span class="tk-dot"></span>LIVE</span>
     <div class="tk-track"><div class="tk-content" id="tk-content">connecting to the live activity feed...</div></div>
+  </div>
+
+  <!-- B metrics dashboard (Tier 1 console): real observability over /api/metrics -->
+  <div id="dashboard-popup" class="secretary-popup hidden">
+    <div class="secretary-popup-backdrop"></div>
+    <div class="secretary-popup-content dash-content">
+      <div class="secretary-popup-header">
+        <h2>CONTROL &middot; METRICS</h2>
+        <button class="secretary-popup-close" id="dash-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="dash-body" id="dash-body">
+        <div class="sec-muted">Loading metrics...</div>
+      </div>
+    </div>
   </div>
 
   <!-- Secretary popup (Step 4): History + Ask tabs over /api/secretary/* -->
@@ -1041,7 +1097,7 @@
         const ag=hitTest(mx,my);
         if(ag){ hideInfo(); if(ag.id==='deal_hunter') showDealHunter(e.clientX,e.clientY); else if(window[POPUP_FN[ag.id]]) window[POPUP_FN[ag.id]](); return; }
         const nx=mx/S, ny=my/S;
-        if(hitControl(nx,ny)){ showControlStats(e.clientX,e.clientY); return; }
+        if(hitControl(nx,ny)){ window.openDashboard && window.openDashboard(); return; }
         const it=hitItem(nx,ny); if(it){ showInfo(it.t,it.b,e.clientX,e.clientY); return; }
         hideInfo();
       });
@@ -1369,6 +1425,84 @@
       }
       refresh();
       setInterval(refresh, 15000);
+    })();
+  </script>
+
+  <script>
+    // ===================================================================
+    // B METRICS DASHBOARD — real observability over /api/metrics (llm_calls +
+    // activity_log). Inline SVG charts, no chart library. Tier 1 console styling.
+    // ===================================================================
+    (function () {
+      "use strict";
+      const AGENT_COL = { deal_hunter: '#ffce5c', job_scout: '#5fd0ff', job_analyst: '#ff8a72', secretary: '#c79bff' };
+      const body = document.getElementById('dash-body');
+      const popup = document.getElementById('dashboard-popup');
+      const fmtInt = (n) => (n || 0).toLocaleString();
+      function fmtDur(s) { s = Math.round(s || 0); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+        if (h) return h + 'h ' + m + 'm'; if (m) return m + 'm'; return s + 's'; }
+      const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+      function stackedBars(rows, aKey, bKey, aColor, bColor) {
+        const n = rows.length, W = 320, H = 70, pad = 2;
+        const max = Math.max(1, ...rows.map((r) => (r[aKey] || 0) + (r[bKey] || 0)));
+        const bw = W / n; let s = '';
+        rows.forEach((r, i) => {
+          const a = r[aKey] || 0, b = r[bKey] || 0;
+          const ah = (a / max) * H, bh = (b / max) * H, x = i * bw + pad, w = Math.max(1, bw - 2 * pad);
+          s += `<rect x="${x.toFixed(1)}" y="${(H - ah).toFixed(1)}" width="${w.toFixed(1)}" height="${ah.toFixed(1)}" fill="${aColor}"/>`;
+          s += `<rect x="${x.toFixed(1)}" y="${(H - ah - bh).toFixed(1)}" width="${w.toFixed(1)}" height="${bh.toFixed(1)}" fill="${bColor}"/>`;
+        });
+        return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:78px;display:block">${s}</svg>`;
+      }
+      function table(headers, rows) {
+        let h = '<table class="dt"><thead><tr>' + headers.map((x, i) => `<th class="${i ? 'num' : ''}">${esc(x)}</th>`).join('') + '</tr></thead><tbody>';
+        h += rows.map((cells) => '<tr>' + cells.map((c, i) => `<td class="${i ? 'num' : ''}">${c}</td>`).join('') + '</tr>').join('');
+        return h + '</tbody></table>';
+      }
+
+      function render(d) {
+        const l = d.llm, a = d.activity;
+        const kpi = (v, label, sub) => `<div class="kpi"><div class="kv">${v}</div><div class="kl">${label}</div>${sub ? `<div class="ksub">${sub}</div>` : ''}</div>`;
+        let html = '<div class="dash-sub">Real observability over the activity log and every LLM call. Window: last ' + d.window_days + ' days. Read-only; no live API calls were made to build this.</div>';
+        html += '<div class="kpi-row">' +
+          kpi(fmtInt(l.total), 'LLM calls', l.ok + ' ok / ' + l.error + ' failed') +
+          kpi((l.success_rate * 100).toFixed(1) + '%', 'Success rate') +
+          kpi(fmtInt(l.tokens.input + l.tokens.output), 'Tokens', fmtInt(l.tokens.input) + ' in / ' + fmtInt(l.tokens.output) + ' out') +
+          kpi('$' + (l.cost_usd || 0).toFixed(4), 'LLM cost') +
+          kpi(l.avg_latency_ms + 'ms', 'Avg latency', 'successful calls') +
+          kpi(fmtInt(a.total_events), 'Activity events') + '</div>';
+        const cpd = l.calls_per_day, tpd = l.tokens_per_day;
+        html += '<div class="dash-grid">';
+        html += '<div class="dash-card"><h4>LLM calls / day</h4>' + stackedBars(cpd, 'ok', 'error', '#2bd66f', '#b85c5c') +
+          '<div class="dash-cap"><span style="color:#2bd66f">ok</span><span>' + cpd[0].date + ' to ' + cpd[cpd.length - 1].date + '</span><span style="color:#b85c5c">failed</span></div></div>';
+        html += '<div class="dash-card"><h4>Tokens / day</h4>' + stackedBars(tpd, 'input', 'output', '#ffce5c', '#5fd0ff') +
+          '<div class="dash-cap"><span style="color:#ffce5c">input</span><span>' + tpd[0].date + ' to ' + tpd[tpd.length - 1].date + '</span><span style="color:#5fd0ff">output</span></div></div>';
+        html += '<div class="dash-card"><h4>By model</h4>' + table(['Model', 'Calls', 'Tok in', 'Tok out', 'Cost'],
+          l.by_model.map((m) => [esc(m.name), fmtInt(m.calls), fmtInt(m.input_tokens), fmtInt(m.output_tokens), '$' + m.cost_usd.toFixed(4)])) + '</div>';
+        html += '<div class="dash-card"><h4>By agent</h4>' + table(['Agent', 'Calls', 'OK', 'Err', 'Cost'],
+          l.by_agent.map((m) => ['<span class="agdot" style="background:' + (AGENT_COL[m.name] || '#888') + '"></span>' + esc(m.name), fmtInt(m.calls), fmtInt(m.ok), fmtInt(m.error), '$' + m.cost_usd.toFixed(4)])) + '</div>';
+        const sd = a.state_durations, sdmax = Math.max(1, ...sd.map((x) => x.seconds));
+        let sdh = '';
+        sd.forEach((x) => { sdh += '<div class="sd-row"><div class="sd-label"><span class="agdot" style="background:' + (AGENT_COL[x.agent] || '#888') + '"></span>' + esc(x.agent) + ' &middot; ' + esc(x.state) + '</div><div class="sd-bar"><div class="sd-fill" style="width:' + (x.seconds / sdmax * 100).toFixed(1) + '%"></div></div><div class="sd-val">' + fmtDur(x.seconds) + '</div></div>'; });
+        html += '<div class="dash-card wide"><h4>Time agents spent in each state</h4>' + (sdh || '<div class="sec-muted">No state changes recorded yet.</div>') + '</div>';
+        html += '</div>';
+        body.innerHTML = html;
+      }
+
+      function openDashboard() {
+        popup.classList.remove('hidden');
+        body.innerHTML = '<div class="sec-muted">Loading metrics...</div>';
+        fetch('/api/metrics?days=14').then((r) => (r.ok ? r.json() : null)).then((d) => {
+          if (d) render(d); else body.innerHTML = '<div class="sec-error">Metrics unavailable.</div>';
+        }).catch(() => { body.innerHTML = '<div class="sec-error">Metrics unavailable.</div>'; });
+      }
+      function closeDashboard() { popup.classList.add('hidden'); }
+      document.getElementById('dash-close').addEventListener('click', closeDashboard);
+      popup.querySelector('.secretary-popup-backdrop').addEventListener('click', closeDashboard);
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !popup.classList.contains('hidden')) closeDashboard(); });
+      const term = document.getElementById('metrics-terminal'); if (term) term.addEventListener('click', openDashboard);
+      window.openDashboard = openDashboard; window.closeDashboard = closeDashboard;
     })();
   </script>
 

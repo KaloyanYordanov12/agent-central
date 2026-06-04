@@ -73,3 +73,17 @@ recolored to the dark palette; the parchment .popup tier was left untouched. The
 split is intentional and obvious: dark = real telemetry, parchment = playful lore.
 Screenshots: f2a-secretary.png, f2a-analyst.png (dark console), f2a-flavor.png,
 f2a-dealhunter.png (parchment).
+
+### Phase 2B: in-world terminal + real metrics dashboard
+Backend: new read-only metrics module (agent_central/metrics.py) + GET /api/metrics
+aggregating llm_calls and activity_log into totals, success rate, tokens, cost, avg
+latency, per-model and per-agent breakdowns, per-day call/token series, activity
+event counts, and per-agent state durations (computed from consecutive
+state_change gaps). 5 new tests (test_metrics.py); full suite 106 passing.
+Frontend: a discoverable, pulsing in-world "LIVE METRICS" terminal pill anchored
+over the Control desks (and the Control screens themselves) opens a Tier 1 console
+dashboard with inline SVG charts (no chart library): KPI tiles, LLM-calls/day and
+tokens/day stacked bars, by-model and by-agent tables, and time-in-state bars.
+This supersedes the old hidden parchment "Control stats" hotspot. Verified live
+with real data (4,724 calls, 2.8% success, 171,474 tokens, state durations).
+Screenshots: f2b-terminal.png, f2b-dashboard-zoom.png.

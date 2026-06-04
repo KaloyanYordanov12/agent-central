@@ -486,6 +486,18 @@ def llm_costs_today():
         raise HTTPException(status_code=500, detail="failed to load llm costs")
 
 
+@app.get("/api/metrics")
+def metrics(days: int = 14):
+    """Read-only observability metrics (LLM tokens/latency/success, per-agent and
+    per-model breakdowns, activity volume and state durations) for the dashboard."""
+    from agent_central import metrics as metrics_mod
+    try:
+        return metrics_mod.compute_metrics(activity_log._DB_PATH, days=days)
+    except Exception:
+        logger.exception("metrics failed")
+        raise HTTPException(status_code=500, detail="failed to compute metrics")
+
+
 # Serve the command center UI
 @app.get("/")
 def root():
