@@ -96,6 +96,24 @@ Return ONLY valid JSON, no prose, in exactly this shape:
 }}"""
 
 
+# Errors that will not fix themselves on retry (empty credit, bad/again key,
+# permission). When one of these hits, the pass aborts and the caller pauses the
+# agent instead of burning one failed call per pending job, every cycle.
+_FATAL_ERROR_MARKERS = (
+    "credit balance is too low",
+    "authentication_error",
+    "invalid x-api-key",
+    "permission_error",
+    "permission denied",
+    "401",
+)
+
+
+def _is_fatal_config_error(exc) -> bool:
+    msg = str(exc).lower()
+    return any(marker in msg for marker in _FATAL_ERROR_MARKERS)
+
+
 def _parse_score_json(raw: str) -> dict:
     """Parse the model's JSON reply, tolerating ```-fenced output."""
     text = (raw or "").strip()
@@ -172,7 +190,8 @@ def process_pending_jobs(db_path: str, profile_system_prompt: str, client,
     Stats: {processed, scored, errors, high_score}. A scoring failure leaves the
     job 'discovered' (retried next pass) and is recorded as an llm_calls error.
     """
-    stats = {"processed": 0, "scored": 0, "errors": 0, "high_score": 0}
+    stats = {"processed": 0, "scored": 0, "errors": 0, "high_score": 0,
+             "fatal_error": None}
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
@@ -205,7 +224,15 @@ def process_pending_jobs(db_path: str, profile_system_prompt: str, client,
                     ok=False, error=str(e), metadata={"url": job["url"]},
                 )
                 logger.warning(f"[job_analyst] scoring failed for {job['url']}: {e}")
-                continue  # leave status 'discovered' for the next pass
+                if _is_fatal_config_error(e):
+                    # Misconfigured/unfunded: do NOT keep trying the rest of the
+                    # queue this pass. Record it and abort so the caller can pause.
+                    stats["fatal_error"] = str(e)[:200]
+                    logger.error(
+                        "[job_analyst] fatal config error; aborting pass: %s", e
+                    )
+                    break
+                continue  # transient error: leave status 'discovered', retry next pass
 
             usage = result.get("usage", {})
             activity_log.log_llm_call(
@@ -307,6 +334,7 @@ def run_analyst_pass(db_path: str, profile_path: str, webhook_url: Optional[str]
         "high_score": proc["high_score"],
         "notified": notif["notified"],
         "notify_errors": notif["errors"],
+        "fatal_error": proc.get("fatal_error"),
     }
 
 

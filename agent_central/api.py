@@ -179,6 +179,11 @@ class JobAnalystTask:
         self.threshold = threshold
         self._task: Optional[asyncio.Task] = None
         self._client = None  # lazy
+        # F4 backoff: once a non-retryable condition is hit (empty credit, bad
+        # key, missing profile), pause and stop calling the API so we never log
+        # thousands of failed calls. Sticky until process restart / reconfigure.
+        self.paused = False
+        self.pause_reason: Optional[str] = None
 
     async def start(self):
         self._task = asyncio.create_task(self._loop())
@@ -193,28 +198,44 @@ class JobAnalystTask:
                 pass
             logger.info("JobAnalystTask stopped")
 
+    def _pause(self, reason: str):
+        """Stop future passes and surface why. Logged exactly once."""
+        if self.paused:
+            return
+        self.paused = True
+        self.pause_reason = reason
+        logger.error(f"[job_analyst] paused (no more API calls): {reason}")
+        try:
+            from agent_central import activity_log
+            activity_log.log_event("job_analyst", "lifecycle", state="paused",
+                                   metadata={"reason": reason})
+        except Exception:
+            logger.exception("failed to log analyst pause event")
+
     async def _loop(self):
         from agent_central import activity_log
         activity_log.log_event("job_analyst", "lifecycle", state="idle",
                                metadata={"event": "first_seen"})
         while True:
-            try:
-                await asyncio.to_thread(self._run_pass)
-            except Exception:
-                logger.exception("Job Analyst pass failed; will retry next cycle")
+            if not self.paused:
+                try:
+                    await asyncio.to_thread(self._run_pass)
+                except Exception:
+                    logger.exception("Job Analyst pass failed; will retry next cycle")
             await asyncio.sleep(self.interval_seconds)
 
     def _run_pass(self):
         from agent_central import job_analyst, activity_log
 
         if not os.path.exists(self.profile_path):
-            logger.warning(f"[job_analyst] no profile at {self.profile_path}; skipping pass")
+            self._pause(f"no profile at {self.profile_path}")
             return
         if self._client is None:
             try:
                 self._client = job_analyst.JobAnalystClient()
             except RuntimeError as e:
-                logger.warning(f"[job_analyst] {e}; skipping pass")
+                # Missing/invalid key: pause rather than re-trying every cycle.
+                self._pause(str(e))
                 return
 
         webhook = os.environ.get("JOB_SCOUT_DISCORD_WEBHOOK_URL")
@@ -229,6 +250,10 @@ class JobAnalystTask:
                                    payload=stats, metadata={"event": "pass_complete"})
             if stats.get("scored", 0) or stats.get("notified", 0):
                 logger.info(f"Job Analyst pass complete: {stats}")
+            # A fatal config error (empty credit, bad key) aborted the pass mid-way.
+            # Pause so we stop hammering the API on the next cycles.
+            if stats.get("fatal_error"):
+                self._pause(f"LLM calls failing: {stats['fatal_error']}")
         except Exception:
             activity_log.log_event("job_analyst", "error", state="error",
                                    metadata={"event": "pass_failed"})
@@ -433,13 +458,17 @@ def jobs_discovered(source: Optional[str] = None, status: Optional[str] = None,
 
 @app.get("/api/jobs/analyst-activity")
 def jobs_analyst_activity(limit: int = 20):
-    """Recent Job Analyst scoring activity + today's summary."""
+    """Recent Job Analyst scoring activity + today's summary + pause state."""
     from agent_central import job_analyst
     try:
-        return job_analyst.get_recent_activity(activity_log._DB_PATH, limit=limit)
+        data = job_analyst.get_recent_activity(activity_log._DB_PATH, limit=limit)
     except Exception:
         logger.exception("jobs/analyst-activity failed")
         raise HTTPException(status_code=500, detail="failed to load analyst activity")
+    # Surface F4 backoff state so the UI can show "paused: misconfigured".
+    data["paused"] = bool(_job_analyst and _job_analyst.paused)
+    data["pause_reason"] = _job_analyst.pause_reason if _job_analyst else None
+    return data
 
 
 @app.get("/api/llm-costs/today")

@@ -198,6 +198,32 @@ def test_process_pending_jobs_handles_client_error(tmp_path):
     assert "api down" in (call["error"] or "")
 
 
+def test_is_fatal_config_error_classifies_credit_auth_vs_transient():
+    cred = RuntimeError(
+        "Error code: 400 - {'message': 'Your credit balance is too low to access "
+        "the Anthropic API.'}")
+    assert job_analyst._is_fatal_config_error(cred) is True
+    assert job_analyst._is_fatal_config_error(Exception("authentication_error: x")) is True
+    assert job_analyst._is_fatal_config_error(RuntimeError("api down")) is False
+    assert job_analyst._is_fatal_config_error(Exception("Connection error.")) is False
+
+
+def test_process_pending_jobs_aborts_pass_on_fatal_error(tmp_path):
+    """F4: a credit/auth failure aborts the whole pass instead of failing every
+    pending job one by one (which is what logged thousands of $0 calls)."""
+    db = _db(tmp_path)
+    for i in range(3):
+        _insert_job(db, f"u{i}", discovered_at=f"2026-06-02T10:0{i}:00+00:00")
+    fatal = RuntimeError("Error code: 400 - Your credit balance is too low")
+    client = FakeJobAnalystClient(raise_exc=fatal)
+    stats = job_analyst.process_pending_jobs(db, "PROMPT", client)
+    assert stats["processed"] == 1            # aborted after the first failure
+    assert stats["errors"] == 1
+    assert stats["fatal_error"]               # surfaced for the caller to pause on
+    assert len(client.calls) == 1             # did NOT hammer the remaining jobs
+    assert all(r["status"] == "discovered" for r in _rows(db).values())
+
+
 def test_process_pending_jobs_respects_max_per_run(tmp_path):
     db = _db(tmp_path)
     for i in range(30):
