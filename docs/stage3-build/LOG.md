@@ -111,3 +111,11 @@ the world (z-index below all UI) tied to the real local clock (night/dawn/midday
 golden-hour/dusk), so the scene subtly reflects the time without hurting the Stage 2
 legibility. No canvas-internals or building-rescale changes (B1 stays out of scope).
 Screenshots: f2d-full.png, f2d-marquee.png.
+
+### Phase 3: full regression pass
+Backend suite: 107 passing (101 from Stage 2 + 6 new metrics/replay tests). Loaded
+the app and confirmed every Stage 2 legibility feature still works in the new
+cohesive dark theme with no collisions: status HUD, live activity ticker, jobs
+funnel, room labels + zone legend, honest cost ticker, offline banner, cold-open
+onboarding, and the F3 empty/paused states (Ask empty state re-themed cleanly).
+The office still renders and animates. Screenshots: p3-composed.png, p3-ask-empty.png.
