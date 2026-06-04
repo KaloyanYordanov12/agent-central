@@ -115,3 +115,13 @@ children of `.building` so they track it wherever it centers, and are
 "Zones" legend maps each room to its pipeline meaning (Browse: scanning the web,
 Thinking: LLM analysis, etc.). Screenshots: `a2-full.png`, `a2-building.png`.
 
+### A1 cold-open onboarding (shipped)
+
+A dismissible centered card on first visit: one line on what this is ("a live
+control room for the real AI agents I run"), one line that every character is
+driven by real backend state over WebSocket and nothing is faked, and a tip to
+click any agent/room/object. Dismissed via the "Enter the office" button, a
+backdrop click, or Escape; remembered in `localStorage` (`ac_onboarded_v1`) so
+returning viewers are not nagged. `window.showOnboarding()` exposed for a future
+help button / verification. Screenshot: `a1-onboarding.png`.
+

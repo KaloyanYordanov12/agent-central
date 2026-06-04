@@ -342,6 +342,28 @@
     .zone-legend .zl { display: flex; gap: 7px; padding: 1.5px 0; line-height: 1.3; }
     .zone-legend .zl b { color: #fff3d8; font-weight: 700; min-width: 56px; }
     .zone-legend .zl span { color: rgba(244, 240, 224, 0.72); }
+
+    /* A1 cold-open onboarding card (dismissible, remembered in localStorage) */
+    .onboard-overlay {
+      position: fixed; inset: 0; z-index: 3000; display: flex;
+      align-items: center; justify-content: center; background: rgba(5, 6, 10, 0.66);
+    }
+    .onboard-overlay.hidden { display: none; }
+    .onboard-card {
+      width: 460px; max-width: 92vw; background: #0e1118;
+      border: 1px solid rgba(255, 176, 0, 0.4); border-radius: 10px;
+      padding: 22px 24px; color: #ffce5c; font-family: 'JetBrains Mono', monospace;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    }
+    .onboard-card h2 { font-size: 18px; letter-spacing: 1px; margin: 0 0 12px; color: #ffd27a; }
+    .onboard-card p { font-size: 13px; line-height: 1.55; color: #f4f0e0; margin: 0 0 10px; }
+    .onboard-card .ob-tip { color: rgba(244, 240, 224, 0.7); font-size: 12px; }
+    .onboard-card button {
+      margin-top: 10px; font-family: inherit; font-size: 13px; font-weight: 700;
+      padding: 9px 18px; background: #ffb000; color: #1a1305; border: none;
+      border-radius: 6px; cursor: pointer;
+    }
+    .onboard-card button:hover { background: #ffce5c; }
   </style>
 </head>
 <body>
@@ -365,6 +387,19 @@
   <div class="popup" id="popup" style="display: none;">
     <button class="popup-close" id="popup-close">×</button>
     <div class="popup-content" id="popup-content"></div>
+  </div>
+
+  <!-- A1 cold-open onboarding card: what this is, that it is real, click anything -->
+  <div class="onboard-overlay hidden" id="onboarding">
+    <div class="onboard-card">
+      <h2>Welcome to Agent Central</h2>
+      <p>A live control room for the real AI agents I build and run.</p>
+      <p>Every character is driven by real backend state over a WebSocket. When an
+         agent actually works, it walks to the matching room. Nothing here is faked.</p>
+      <p class="ob-tip">Tip: click any agent, room screen, or object to inspect it.
+         The strip on the left and the ticker below update live.</p>
+      <button id="onboard-enter">Enter the office</button>
+    </div>
   </div>
 
   <!-- A2 zone legend: what each room means in the agent pipeline -->
@@ -1126,6 +1161,33 @@
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', place);
       } else { place(); }
+    })();
+  </script>
+
+  <script>
+    // ===================================================================
+    // A1 COLD-OPEN ONBOARDING — a dismissible intro card on first visit,
+    // remembered in localStorage so returning viewers are not nagged.
+    // ===================================================================
+    (function () {
+      "use strict";
+      const KEY = 'ac_onboarded_v1';
+      const overlay = document.getElementById('onboarding');
+      if (!overlay) return;
+      function show() { overlay.classList.remove('hidden'); }
+      function dismiss() {
+        overlay.classList.add('hidden');
+        try { localStorage.setItem(KEY, '1'); } catch (e) { /* private mode */ }
+      }
+      let seen = false;
+      try { seen = localStorage.getItem(KEY) === '1'; } catch (e) { seen = false; }
+      if (!seen) show();
+      document.getElementById('onboard-enter').addEventListener('click', dismiss);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) dismiss(); });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !overlay.classList.contains('hidden')) dismiss();
+      });
+      window.showOnboarding = show;   // for verification / a future "help" button
     })();
   </script>
 
