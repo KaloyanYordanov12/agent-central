@@ -486,6 +486,17 @@ def llm_costs_today():
         raise HTTPException(status_code=500, detail="failed to load llm costs")
 
 
+@app.get("/api/replay/timeline")
+def replay_timeline(days: int = 3, limit: int = 5000):
+    """Ordered real recorded state events for REPLAY mode (oldest first)."""
+    try:
+        events = activity_log.get_replay_timeline(activity_log._DB_PATH, days=days, limit=limit)
+    except Exception:
+        logger.exception("replay/timeline failed")
+        raise HTTPException(status_code=500, detail="failed to load replay timeline")
+    return {"count": len(events), "events": events}
+
+
 @app.get("/api/metrics")
 def metrics(days: int = 14):
     """Read-only observability metrics (LLM tokens/latency/success, per-agent and

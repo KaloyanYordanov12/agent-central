@@ -464,6 +464,39 @@
     .sd-bar { flex: 1; height: 9px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
     .sd-fill { height: 100%; background: #5fd0ff; border-radius: 3px; }
     .sd-val { width: 84px; flex: none; text-align: right; color: rgba(244,240,224,0.7); font-variant-numeric: tabular-nums; }
+
+    /* C REPLAY mode: enter pill, control bar, persistent badge. Honest by design. */
+    .replay-pill {
+      position: fixed; right: 14px; bottom: 40px; z-index: 870; cursor: pointer;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+      color: #ffce5c; background: rgba(10,12,18,0.92); border: 1px solid rgba(255,176,0,0.4);
+      padding: 6px 12px; border-radius: 18px;
+    }
+    .replay-pill:hover { background: rgba(30,36,48,0.95); }
+    .replay-bar {
+      position: fixed; left: 50%; transform: translateX(-50%); bottom: 36px; z-index: 905;
+      display: flex; align-items: center; gap: 12px; width: min(840px, calc(100vw - 40px));
+      background: rgba(10,12,18,0.96); border: 1px solid rgba(255,176,0,0.45);
+      border-radius: 10px; padding: 9px 14px; box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+      font-family: 'JetBrains Mono', monospace; color: #f4f0e0;
+    }
+    .replay-bar.hidden, .replay-pill.hidden { display: none; }
+    .rp-badge {
+      flex: none; display: flex; align-items: center; gap: 7px; font-weight: 700;
+      font-size: 12px; letter-spacing: 2px; color: #ff6b6b;
+    }
+    .rp-badge .rp-dot { width: 9px; height: 9px; border-radius: 50%; background: #ff3b3b;
+      animation: tk-pulse 1.1s ease-in-out infinite; }
+    .rp-time { flex: none; font-size: 12px; color: #ffd27a; font-variant-numeric: tabular-nums; min-width: 168px; }
+    .rp-btn {
+      flex: none; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+      background: #1b2230; color: #ffce5c; border: 1px solid rgba(255,176,0,0.35);
+      border-radius: 6px; padding: 4px 10px; line-height: 1;
+    }
+    .rp-btn:hover { background: #28324a; }
+    .rp-speed { flex: none; background: #11151d; color: #ffce5c; border: 1px solid rgba(255,176,0,0.35);
+      border-radius: 6px; font-family: inherit; font-size: 11px; padding: 4px 6px; }
+    #rp-scrub { flex: 1; accent-color: #ffb000; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -527,6 +560,21 @@
   <div class="status-hud" id="status-hud">
     <h3>Agents · live</h3>
     <div id="sh-rows"></div>
+  </div>
+
+  <!-- C REPLAY mode: enter pill + control bar (only one shows at a time) -->
+  <div class="replay-pill" id="replay-pill" title="Replay the office from real recorded events">&#8634; Replay the recorded day</div>
+  <div class="replay-bar hidden" id="replay-bar">
+    <span class="rp-badge"><span class="rp-dot"></span>REPLAY</span>
+    <span class="rp-time" id="rp-time">--</span>
+    <button class="rp-btn" id="rp-play" title="Play / pause">&#9658;</button>
+    <select class="rp-speed" id="rp-speed" title="Replay speed">
+      <option value="500">500x</option>
+      <option value="2000" selected>2000x</option>
+      <option value="8000">8000x</option>
+    </select>
+    <input type="range" id="rp-scrub" min="0" max="1000" value="0" />
+    <button class="rp-btn" id="rp-exit" title="Back to live">Exit</button>
   </div>
 
   <!-- D1 live activity ticker: real events from the activity log, newest first -->
@@ -996,7 +1044,9 @@
       const wsProto = location.protocol==='https:'?'wss:':'ws:';
       let ws = new WebSocket(`${wsProto}//${location.host}/ws/status`);
       ws.onopen = ()=>console.log('[WS] connected');
-      ws.onmessage = (event)=>{ try{ const msg=JSON.parse(event.data);
+      ws.onmessage = (event)=>{ try{
+        if(window.__replayActive) return;   // replay takes over; ignore live state
+        const msg=JSON.parse(event.data);
         if(msg.type==='status' && msg.payload && msg.payload.agent_id){
           AGENT_LIVE[msg.payload.agent_id]={state:msg.payload.state, action:msg.payload.current_action};
           setBackendState(msg.payload.agent_id, msg.payload.state); }
@@ -1503,6 +1553,75 @@
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !popup.classList.contains('hidden')) closeDashboard(); });
       const term = document.getElementById('metrics-terminal'); if (term) term.addEventListener('click', openDashboard);
       window.openDashboard = openDashboard; window.closeDashboard = closeDashboard;
+    })();
+  </script>
+
+  <script>
+    // ===================================================================
+    // C REPLAY MODE — re-drives the office from REAL recorded events
+    // (/api/replay/timeline). Honest by construction: only real recorded states,
+    // a persistent REPLAY badge + the replayed timestamp, and a clean separation
+    // from live (the WS handler ignores live updates while window.__replayActive).
+    // ===================================================================
+    (function () {
+      "use strict";
+      const pill = document.getElementById('replay-pill');
+      const bar = document.getElementById('replay-bar');
+      const timeEl = document.getElementById('rp-time');
+      const playBtn = document.getElementById('rp-play');
+      const speedSel = document.getElementById('rp-speed');
+      const scrub = document.getElementById('rp-scrub');
+      const exitBtn = document.getElementById('rp-exit');
+      const RP = { active: false, playing: false, events: [], t0: 0, t1: 0, rt: 0, applied: {} };
+
+      function applyState(id, state) {
+        if (window.AGENT_LIVE) window.AGENT_LIVE[id] = { state: state };
+        if (window.setBackendState) window.setBackendState(id, state);
+      }
+      function applyAt(t) {
+        const cur = {};
+        for (const ev of RP.events) { if (ev.t <= t) cur[ev.agent_id] = ev.state; else break; }
+        for (const id in cur) { if (RP.applied[id] !== cur[id]) { RP.applied[id] = cur[id]; applyState(id, cur[id]); } }
+        timeEl.textContent = RP.events.length ? new Date(t).toLocaleString() : 'No recorded events';
+        const span = RP.t1 - RP.t0; scrub.value = span > 0 ? Math.round((t - RP.t0) / span * 1000) : 0;
+      }
+      function setPlay(on) { RP.playing = on; playBtn.innerHTML = on ? '&#10073;&#10073;' : '&#9658;'; }
+
+      function enter() {
+        fetch('/api/replay/timeline?days=3').then((r) => (r.ok ? r.json() : null)).then((data) => {
+          const evs = ((data && data.events) || [])
+            .map((e) => ({ t: Date.parse(e.timestamp), agent_id: e.agent_id, state: e.state }))
+            .filter((e) => !isNaN(e.t));
+          RP.events = evs;
+          RP.t0 = evs.length ? evs[0].t : 0;
+          RP.t1 = evs.length ? evs[evs.length - 1].t : 0;
+          RP.rt = RP.t0; RP.applied = {};
+          RP.active = true; window.__replayActive = true;
+          pill.classList.add('hidden'); bar.classList.remove('hidden');
+          setPlay(evs.length > 0); applyAt(RP.rt);
+        }).catch(() => { timeEl.textContent = 'Replay unavailable.'; });
+      }
+      function exit() {
+        RP.active = false; RP.playing = false; window.__replayActive = false;
+        bar.classList.add('hidden'); pill.classList.remove('hidden');
+        // Live WS resumes on its own (next agent_states message snaps agents back).
+      }
+
+      pill.addEventListener('click', enter);
+      exitBtn.addEventListener('click', exit);
+      playBtn.addEventListener('click', () => { if (!RP.active) return; if (RP.rt >= RP.t1) RP.rt = RP.t0; setPlay(!RP.playing); });
+      scrub.addEventListener('input', () => { if (!RP.active) return; const span = RP.t1 - RP.t0; RP.rt = RP.t0 + (scrub.value / 1000) * span; applyAt(RP.rt); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && RP.active) exit(); });
+
+      setInterval(() => {
+        if (!RP.active || !RP.playing) return;
+        const sp = +speedSel.value || 2000;
+        RP.rt += 100 * sp;
+        if (RP.rt >= RP.t1) { RP.rt = RP.t1; setPlay(false); }
+        applyAt(RP.rt);
+      }, 100);
+
+      window.__enterReplay = enter; window.__exitReplay = exit;  // for verification
     })();
   </script>
 

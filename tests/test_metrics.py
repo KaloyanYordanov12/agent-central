@@ -96,6 +96,23 @@ def test_metrics_endpoint_shape(client, temp_activity_db):
     assert "by_model" in data["llm"] and "state_durations" in data["activity"]
 
 
+def test_replay_timeline_ordered_state_events_only(client, temp_activity_db):
+    db = temp_activity_db
+    _evt(db, "deal_hunter", "state_change", "scanning", ts=_ts(10, 0, 0))
+    _evt(db, "deal_hunter", "lifecycle", "online", ts=_ts(10, 1, 0))
+    _evt(db, "job_scout", "state_change", "idle", ts=_ts(10, 2, 0))
+    # a lifecycle event with no state must be excluded (state is None)
+    conn = sqlite3.connect(db)
+    conn.execute("INSERT INTO activity_log (timestamp, agent_id, event_type, state) "
+                 "VALUES (?,?,?,?)", (_ts(10, 3, 0), "job_scout", "lifecycle", None))
+    conn.commit(); conn.close()
+    data = client.get("/api/replay/timeline?days=7").json()
+    assert data["count"] == 3  # the null-state row is excluded
+    evs = data["events"]
+    assert [e["state"] for e in evs] == ["scanning", "online", "idle"]  # oldest first
+    assert all("agent_id" in e and "timestamp" in e for e in evs)
+
+
 def test_metrics_empty_db_is_safe(client, temp_activity_db):
     data = client.get("/api/metrics").json()
     assert data["llm"]["total"] == 0 and data["llm"]["success_rate"] == 0

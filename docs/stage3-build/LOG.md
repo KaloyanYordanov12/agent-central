@@ -87,3 +87,17 @@ tokens/day stacked bars, by-model and by-agent tables, and time-in-state bars.
 This supersedes the old hidden parchment "Control stats" hotspot. Verified live
 with real data (4,724 calls, 2.8% success, 171,474 tokens, state durations).
 Screenshots: f2b-terminal.png, f2b-dashboard-zoom.png.
+
+### Phase 2C: REPLAY mode (honest by construction)
+Backend: activity_log.get_replay_timeline + GET /api/replay/timeline returns the
+ordered (oldest-first) real state-bearing events for the last N days as compact
+{timestamp, agent_id, state} rows. 1 new test (870 real events live).
+Frontend: a "Replay the recorded day" pill enters replay; a control bar shows a
+persistent pulsing red REPLAY badge, the exact replayed timestamp, play/pause, a
+speed selector (500x/2000x/8000x) and a draggable scrubber. A replay clock advances
+the replayed time and applies, per agent, the latest recorded state at that moment
+via setBackendState, so the existing walking sim re-enacts the day. Honesty +
+clean separation: while window.__replayActive the live WS handler ignores live
+messages; replay only ever plays REAL recorded states (never fabricated); Exit
+returns to live. Verified: scrubbing moves the replayed clock across 2026-06-03/04
+and the office re-enacts. Screenshots: f2c-replay.png, f2c-replay-bar.png.

@@ -283,6 +283,35 @@ def get_events_since_id(last_id: int, limit: int = MAX_LIMIT) -> list[dict]:
     return events
 
 
+def get_replay_timeline(db_path: Optional[str] = None, days: int = 3,
+                        limit: int = 5000) -> list[dict]:
+    """Ordered, state-bearing events for the REPLAY mode.
+
+    Returns real recorded state changes / lifecycle states (oldest first) within
+    the last `days` calendar days, as compact {timestamp, agent_id, state} rows.
+    Read-only; never fabricates anything. Used to re-drive the office from history.
+    """
+    from datetime import date, timedelta
+    db_path = db_path or _DB_PATH
+    days = max(1, min(int(days), 30))
+    limit = max(1, min(int(limit), MAX_LIMIT * 50))
+    cutoff = (date.today() - timedelta(days=days - 1)).isoformat() + "T00:00:00"
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            "SELECT timestamp, agent_id, state FROM activity_log "
+            "WHERE timestamp >= ? AND state IS NOT NULL "
+            "AND event_type IN ('state_change', 'lifecycle') "
+            "ORDER BY id ASC LIMIT ?",
+            (cutoff, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [{"timestamp": r["timestamp"], "agent_id": r["agent_id"],
+             "state": r["state"]} for r in rows]
+
+
 def get_current_state(agent_id: str) -> Optional[dict]:
     """Return the most recent state-bearing event for an agent.
 
