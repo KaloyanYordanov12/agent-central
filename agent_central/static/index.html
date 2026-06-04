@@ -476,7 +476,7 @@
 
     /* C REPLAY mode: enter pill, control bar, persistent badge. Honest by design. */
     .replay-pill {
-      position: fixed; right: 14px; bottom: 40px; z-index: 870; cursor: pointer;
+      position: fixed; right: 14px; top: 244px; z-index: 870; cursor: pointer;
       font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
       color: #ffce5c; background: rgba(10,12,18,0.92); border: 1px solid rgba(255,176,0,0.4);
       padding: 6px 12px; border-radius: 18px;
@@ -1029,15 +1029,17 @@
       for(const ag of order){
         if(ag.glow){ vctx.strokeStyle=ag.col; vctx.lineWidth=2; vctx.strokeRect((ag.x-13)*S, (ag.y-30)*S, 26*S, 32*S); }
       }
-      // Collision-aware name labels: when two agents are adjacent their labels
-      // would overlap, so stagger the later one upward until it clears.
+      // Collision-aware name labels: stagger crowded labels upward, keep a small
+      // horizontal gap so adjacent ones do not touch, and clamp to the canvas so
+      // they never run off the edge (which crowded the bottom/corner before).
       vctx.font='bold 10px JetBrains Mono, monospace';
-      const placed=[];
+      const placed=[]; const CW=NW*S, HPAD=7;
       for(const ag of order){
-        const w=Math.ceil(vctx.measureText(ag.name).width)+8, h=14, cx=ag.x*S;
+        const w=Math.ceil(vctx.measureText(ag.name).width)+8, h=14;
+        let cx=Math.max(w/2+2, Math.min(ag.x*S, CW-w/2-2));   // keep box on-canvas
         let y=(ag.y-28)*S-7-h;
-        for(let g=0; g<8; g++){ let hit=false;
-          for(const p of placed){ if(Math.abs(cx-p.cx)<(w+p.w)/2 && y<p.y+p.h+2 && y+h>p.y-2){ y=p.y-h-3; hit=true; } }
+        for(let g=0; g<12; g++){ let hit=false;
+          for(const p of placed){ if(Math.abs(cx-p.cx)<(w+p.w)/2+HPAD && y<p.y+p.h+2 && y+h>p.y-2){ y=p.y-h-3; hit=true; } }
           if(!hit) break; }
         placed.push({cx,y,w,h});
         drawLabelAt(vctx, cx, y, w, h, ag.name, ag.col, ag.mode==='offline');

@@ -30,3 +30,15 @@ keyed on a signature of the exact condition (which agents are offline, or
 new condition (a different agent going offline, or the set changing) shows it
 again. Verified: the banner shows a close button, and after dismissing it stays
 hidden across a 4s poll cycle. Screenshot: p1-2-banner.png.
+
+### P1.3 bottom label overlap + P1.4 replay pill collision
+P1.4: moved the replay pill from the bottom-right corner (where it sat over the
+activity ticker / Windows-watermark area) to the right rail just below the jobs
+funnel (top:244, right:14), so it is fully readable and clear of the ticker and
+corner at common window sizes.
+P1.3: strengthened the name-label layout: added a 7px horizontal gap to the
+overlap test (so adjacent labels like "Job Analyst"/"Secretary" stagger onto their
+own rows instead of touching) and clamped each label box to stay within the canvas
+so crowded bottom-edge labels never run off the edge or into the corner. Verified
+by clustering all four agents in the Lounge: labels stack into four clean,
+readable rows and stay on-canvas. Screenshots: p1-3-labels-after.png, p1-34-after.png.
