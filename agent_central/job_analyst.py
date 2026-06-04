@@ -183,15 +183,48 @@ class JobAnalystClient:
         return parsed
 
 
+class SpendGuard:
+    """Hard, inviolable caps for a real LLM run. Checked BEFORE every call so the
+    analyst stops calling the moment any cap is reached.
+
+    Caps: max real call attempts, max estimated USD spend, and a wall-clock
+    deadline. Whichever is hit first makes allow() return False (and records why).
+    """
+
+    def __init__(self, max_calls: int = 60, max_cost_usd: float = 1.00,
+                 max_seconds: float = 900.0):
+        self.max_calls = max_calls
+        self.max_cost = max_cost_usd
+        self.deadline = time.monotonic() + max_seconds
+        self.calls = 0
+        self.cost = 0.0
+        self.stopped = None  # 'max_calls' | 'max_cost' | 'time'
+
+    def allow(self) -> bool:
+        if self.calls >= self.max_calls:
+            self.stopped = "max_calls"; return False
+        if self.cost >= self.max_cost:
+            self.stopped = "max_cost"; return False
+        if time.monotonic() >= self.deadline:
+            self.stopped = "time"; return False
+        return True
+
+    def record(self, cost_usd: float) -> None:
+        self.calls += 1
+        self.cost += max(0.0, cost_usd or 0.0)
+
+
 def process_pending_jobs(db_path: str, profile_system_prompt: str, client,
-                         max_per_run: int = 20) -> dict:
+                         max_per_run: int = 20, guard: "SpendGuard | None" = None) -> dict:
     """Score up to max_per_run 'discovered' jobs; update status + log each call.
 
-    Stats: {processed, scored, errors, high_score}. A scoring failure leaves the
-    job 'discovered' (retried next pass) and is recorded as an llm_calls error.
+    Stats: {processed, scored, errors, high_score, fatal_error, capped}. A scoring
+    failure leaves the job 'discovered' (retried next pass). If a SpendGuard is
+    given, the loop stops BEFORE the call that would breach any cap (stats['capped']
+    records which cap), so no call is ever made past a cap.
     """
     stats = {"processed": 0, "scored": 0, "errors": 0, "high_score": 0,
-             "fatal_error": None}
+             "fatal_error": None, "capped": None}
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
@@ -204,6 +237,10 @@ def process_pending_jobs(db_path: str, profile_system_prompt: str, client,
 
         model = getattr(client, "model", DEFAULT_MODEL)
         for row in rows:
+            # Inviolable cap check BEFORE any spend.
+            if guard is not None and not guard.allow():
+                stats["capped"] = guard.stopped
+                break
             job = {
                 "url": row["url"],
                 "source": row["source"],
@@ -218,6 +255,8 @@ def process_pending_jobs(db_path: str, profile_system_prompt: str, client,
                 result = client.score_job(profile_system_prompt, job)
             except Exception as e:
                 stats["errors"] += 1
+                if guard is not None:
+                    guard.record(0.0)  # a failed attempt still counts toward the call cap
                 activity_log.log_llm_call(
                     "job_analyst", model, "score_job", 0, 0,
                     duration_ms=int((time.monotonic() - start) * 1000),
@@ -235,6 +274,12 @@ def process_pending_jobs(db_path: str, profile_system_prompt: str, client,
                 continue  # transient error: leave status 'discovered', retry next pass
 
             usage = result.get("usage", {})
+            if guard is not None:
+                cost = activity_log._estimate_cost_usd(
+                    model, usage.get("input_tokens", 0), usage.get("output_tokens", 0),
+                    usage.get("cache_creation_tokens", 0), usage.get("cache_read_tokens", 0),
+                ) or 0.0
+                guard.record(cost)
             activity_log.log_llm_call(
                 "job_analyst", model, "score_job",
                 usage.get("input_tokens", 0), usage.get("output_tokens", 0),

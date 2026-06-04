@@ -42,3 +42,13 @@ own rows instead of touching) and clamped each label box to stay within the canv
 so crowded bottom-edge labels never run off the edge or into the corner. Verified
 by clustering all four agents in the Lounge: labels stack into four clean,
 readable rows and stay on-canvas. Screenshots: p1-3-labels-after.png, p1-34-after.png.
+
+## Phase 2: data refresh (HARD-CAPPED real spend)
+
+### SpendGuard (built + verified BEFORE any spend)
+Added job_analyst.SpendGuard(max_calls, max_cost_usd, max_seconds): allow() is
+checked before every call and returns False (recording which cap) once any cap is
+hit; record() accrues calls + estimated cost. process_pending_jobs takes an
+optional guard and stops the loop before any call that would breach a cap.
+Unit-tested: each cap triggers; a guard with 0 allowed calls makes ZERO real
+calls; a cap of 2 stops after exactly 2. Full suite: 110 passing.

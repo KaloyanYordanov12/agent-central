@@ -208,6 +208,47 @@ def test_is_fatal_config_error_classifies_credit_auth_vs_transient():
     assert job_analyst._is_fatal_config_error(Exception("Connection error.")) is False
 
 
+def test_spend_guard_enforces_each_cap():
+    # call cap
+    g = job_analyst.SpendGuard(max_calls=2, max_cost_usd=99, max_seconds=99)
+    assert g.allow() is True
+    g.record(0.0); assert g.allow() is True
+    g.record(0.0); assert g.allow() is False and g.stopped == "max_calls"
+    # cost cap
+    g2 = job_analyst.SpendGuard(max_calls=99, max_cost_usd=0.005, max_seconds=99)
+    g2.record(0.004); assert g2.allow() is True
+    g2.record(0.004); assert g2.allow() is False and g2.stopped == "max_cost"
+    # time cap (deadline already passed)
+    g3 = job_analyst.SpendGuard(max_calls=99, max_cost_usd=99, max_seconds=0)
+    assert g3.allow() is False and g3.stopped == "time"
+
+
+def test_process_pending_jobs_guard_zero_calls_makes_no_calls(tmp_path):
+    """The critical safety check: a guard with 0 allowed calls spends nothing."""
+    db = _db(tmp_path)
+    for i in range(3):
+        _insert_job(db, f"u{i}", discovered_at=f"2026-06-02T10:0{i}:00+00:00")
+    client = FakeJobAnalystClient(score=80)
+    guard = job_analyst.SpendGuard(max_calls=0, max_cost_usd=1.0, max_seconds=900)
+    stats = job_analyst.process_pending_jobs(db, "PROMPT", client, guard=guard)
+    assert len(client.calls) == 0          # zero real calls
+    assert stats["processed"] == 0 and stats["capped"] == "max_calls"
+    assert all(r["status"] == "discovered" for r in _rows(db).values())
+
+
+def test_process_pending_jobs_guard_stops_at_call_cap(tmp_path):
+    db = _db(tmp_path)
+    for i in range(5):
+        _insert_job(db, f"u{i}", discovered_at=f"2026-06-02T10:0{i}:00+00:00")
+    client = FakeJobAnalystClient(score=80)
+    guard = job_analyst.SpendGuard(max_calls=2, max_cost_usd=1.0, max_seconds=900)
+    stats = job_analyst.process_pending_jobs(db, "PROMPT", client, guard=guard)
+    assert len(client.calls) == 2          # stopped after exactly 2 calls
+    assert guard.calls == 2 and stats["capped"] == "max_calls"
+    scored = sum(1 for r in _rows(db).values() if r["status"] != "discovered")
+    assert scored == 2                     # only the 2 scored jobs changed status
+
+
 def test_process_pending_jobs_aborts_pass_on_fatal_error(tmp_path):
     """F4: a credit/auth failure aborts the whole pass instead of failing every
     pending job one by one (which is what logged thousands of $0 calls)."""
