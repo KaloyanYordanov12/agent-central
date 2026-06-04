@@ -119,3 +119,14 @@ cohesive dark theme with no collisions: status HUD, live activity ticker, jobs
 funnel, room labels + zone legend, honest cost ticker, offline banner, cold-open
 onboarding, and the F3 empty/paused states (Ask empty state re-themed cleanly).
 The office still renders and animates. Screenshots: p3-composed.png, p3-ask-empty.png.
+
+### Phase 4: hero demo + README stills
+Produced an animated hero GIF (docs/stage3-build/hero-demo.gif, 29 frames, ~2.3MB,
+assembled from CDP-captured frames with Pillow since ffmpeg was unavailable):
+the live office (agents walking, HUD/ticker/funnel live), the metrics dashboard,
+then REPLAY mode scrubbing through a recorded day. Also captured polished README
+stills: readme-cold-open, readme-office, readme-dashboard, readme-replay,
+readme-secretary. Updated the README to embed the new honest GIF (replacing the
+stale video link), describe the dashboard + replay, and document the cohesive
+two-tier UI. F2-style honesty preserved: every asset is a real capture of the
+current build; nothing claims behavior the build does not have.

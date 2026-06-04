@@ -2,7 +2,9 @@
 
 > A real-time observatory for AI agents at work. Watch your agents like you'd watch your colleagues across the office floor — see what they're doing, when, and where.
 
-https://github.com/user-attachments/assets/d029066d-9fd6-4c90-8a44-6409291fa107
+![Agent Central: the live office, the metrics dashboard, and REPLAY mode](docs/stage3-build/hero-demo.gif)
+
+*A live capture of the current build: the live office with the status HUD, ticker and jobs funnel; the metrics dashboard; and REPLAY mode scrubbing through a recorded day.*
 
 **Run it:** locally on `127.0.0.1:8001` (see "Running it locally"). Public demos have used ephemeral cloudflared quick-tunnels, so there is no permanent hosted link.
 **Built:** May to June 2026, ~48 hours from skeleton to shipped
@@ -35,7 +37,9 @@ The deeper design idea: agents are workers. They have shifts, tasks, downtime. V
 - **Maps agent state to physical zones** in a pixel-art office (operations, communications, writing desk, research, lounge)
 - **Drives an autonomous character** that walks between zones, takes elevators between floors
 - **Surfaces live state everywhere you look:** an always-on status strip (one row per agent with state, current action, and "updated Ns ago"), a scrolling activity ticker narrating real events from the activity log, a jobs pipeline funnel, labelled rooms, and a work bubble above an agent when it is at a desk
-- **Offers clickable interactive elements** with quest-screen-style popups: each agent, the control-room screens (live LLM spend/usage), and flavor objects around the office
+- **Offers clickable elements** with popups: each agent, in-world flavor objects, and a dedicated terminal
+- **Opens a real metrics dashboard** (click the in-world LIVE METRICS terminal): LLM tokens, latency, success vs error rate, per-model and per-agent breakdowns, calls and tokens per day, and how long each agent spent in each state, all read from the activity log and recorded LLM calls
+- **Replays the recorded day**: a clearly-badged REPLAY mode re-drives the office from real recorded events with a timeline scrubber and play/pause/speed, so the agents re-enact their history (a replay of real telemetry, never fabricated)
 - **Onboards a cold viewer** with a dismissible intro card, and **degrades honestly**: an offline agent dims and a calm banner explains its separate service is not running (offline, not broken)
 
 ---
@@ -135,13 +139,13 @@ The Ask tab requires `ANTHROPIC_API_KEY` to be set in the environment (a missing
 
 ### Demo
 
-The demo video at the top of this README shows the original office before the Secretary was added. Clone the repo, start the server, and the Secretary character appears in the office at the lower-left, ready to click.
+The GIF at the top of this README is a live capture of the current build: the live office with the status HUD, ticker and jobs funnel, the metrics dashboard, and REPLAY mode scrubbing through a recorded day. Clone the repo and start the server to explore it; the Secretary character is at the lower-left, ready to click.
 
 ---
 
 ## Status
 
-**What works:** Everything in this README. The system runs, the agents walk between rooms, the popups open, the always-on status HUD and activity ticker track live state, the jobs funnel shows the real pipeline, and the test suite is green.
+**What works:** Everything in this README. The system runs, the agents walk between rooms, the popups open, the always-on status HUD and activity ticker track live state, the jobs funnel shows the real pipeline, the in-world terminal opens a real metrics dashboard, REPLAY mode re-enacts the recorded day, and the test suite is green.
 
 **What's pending:** Deal Hunter's Reddit scanner is currently blocked on a 403 from Reddit's CDN; they have tightened their bot detection beyond what a header workaround can solve. Restoring it requires either PRAW pre-approval (Reddit's official policy, a multi-week approval process) or rotating residential proxies. The architecture is platform-agnostic: once data flows in, the visualization pipeline reacts in real time.
 
@@ -153,9 +157,9 @@ The demo video at the top of this README shows the original office before the Se
 
 Some design decisions worth flagging because they shaped the whole thing:
 
-**Parchment quest-screen popups instead of terminal-style overlays:** Early popups were black backgrounds with amber JetBrains Mono text — classic developer terminal look. They clashed badly against the painted world. Switched to a warm parchment palette (cream background, dark brown text, double-line border, circular wax-seal close button) and everything cohered. The popups now feel like NPC dialogue from an RPG instead of console output.
+**One cohesive UI in two deliberate tiers:** every data surface (the status HUD, activity ticker, jobs funnel, cost ticker, the Secretary / Job Scout / Job Analyst panels, and the metrics dashboard) shares a dark "console" palette: charcoal, amber accents, JetBrains Mono. The warm parchment popups are kept only for in-world flavor objects and character lore. The rule a viewer can feel is simple: dark console means real telemetry, warm parchment means playful lore, and the split is intentional rather than two styles bolted together.
 
-**Navy mounted status plaque, not a corner HUD:** The AGENT CENTRAL sign on the building's roof established a visual language (navy plate, off-white text, JetBrains Mono). The status overlay inside the building uses the same palette so it reads as a mounted info plaque on the building's interior wall, not as floating UI.
+**The office stays the hero:** all of that chrome is dark, translucent, and pushed to the edges so the pixel-art building is never buried. A subtle day/night tint tied to the real clock sits behind the UI without hurting readability.
 
 **Always-on legibility over hidden depth:** the strongest part of the story is that this is a real, measurable system, so that state is surfaced up front rather than hidden behind clicks. A status strip, a live activity ticker narrating real events, labelled rooms with a zone legend, and a jobs pipeline funnel mean a first-time viewer understands what they are looking at in a few seconds, and that it is driven by real agents.
 
