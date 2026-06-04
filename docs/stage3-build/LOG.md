@@ -130,3 +130,13 @@ readme-secretary. Updated the README to embed the new honest GIF (replacing the
 stale video link), describe the dashboard + replay, and document the cohesive
 two-tier UI. F2-style honesty preserved: every asset is a real capture of the
 current build; nothing claims behavior the build does not have.
+
+## Final summary
+Shipped on branch `stage2-legibility` (not merged): P1.1 top-bar collision fix,
+P1.2 agent-label staggering, 2A two-tier popup unification, 2B in-world terminal +
+real metrics dashboard (new /api/metrics, +5 tests), 2C honest REPLAY mode (new
+/api/replay/timeline, +1 test), 2D ambient polish (marquee, frame, day/night tint).
+Backend tests: 107 passing (101 at Stage 2 end + 6 new). Real Anthropic API calls
+this run: 0 (server always ran with ANTHROPIC_API_KEY unset; the Job Analyst paused
+via F4). All Stage 2 legibility features verified still working. Demo + stills live
+in docs/stage3-build/ (hero-demo.gif, readme-*.png, plus per-feature shots).
