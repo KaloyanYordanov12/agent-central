@@ -379,6 +379,28 @@
       background: #9aa2b4; flex: none; }
     .offline-banner.reconnecting { border-color: #ffb000; }
     .offline-banner.reconnecting .ob-dot { background: #ffb000; animation: tk-pulse 1.2s ease-in-out infinite; }
+
+    /* D3 jobs funnel — live pipeline counts (read-only) */
+    .jobs-funnel {
+      position: fixed; top: 14px; right: 14px; z-index: 850; width: 218px;
+      background: rgba(10, 12, 18, 0.9); border: 1px solid rgba(255, 176, 0, 0.3);
+      border-radius: 6px; padding: 8px 10px 9px;
+      font-family: 'JetBrains Mono', monospace; color: #ffce5c;
+    }
+    .jobs-funnel h3 { font-size: 10px; letter-spacing: 2px; color: rgba(255,176,0,0.6);
+      margin: 0 0 7px; font-weight: 700; text-transform: uppercase; }
+    .jf-row { margin: 5px 0; }
+    .jf-top { display: flex; justify-content: space-between; font-size: 11px; color: #f4f0e0; }
+    .jf-top b { font-weight: 700; }
+    .jf-bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.08);
+      margin-top: 2px; overflow: hidden; }
+    .jf-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+    .jf-found { background: #ffce5c; }
+    .jf-filter { background: #6b7280; }
+    .jf-llm { background: #b85c5c; }
+    .jf-scored { background: #2e8a3e; }
+    .jf-notified { background: #2bd66f; }
+    .jf-empty { font-size: 10.5px; color: rgba(244,240,224,0.55); }
   </style>
 </head>
 <body>
@@ -402,6 +424,12 @@
   <div class="popup" id="popup" style="display: none;">
     <button class="popup-close" id="popup-close">×</button>
     <div class="popup-content" id="popup-content"></div>
+  </div>
+
+  <!-- D3 jobs funnel: live pipeline counts from /api/jobs/discovered -->
+  <div class="jobs-funnel" id="jobs-funnel">
+    <h3>Jobs pipeline</h3>
+    <div id="jf-rows"><div class="jf-empty">Loading pipeline...</div></div>
   </div>
 
   <!-- A4 honest offline / reconnecting banner (only shows when something is down) -->
@@ -1255,6 +1283,52 @@
       }
       tick();
       setInterval(tick, 4000);
+    })();
+  </script>
+
+  <script>
+    // ===================================================================
+    // D3 JOBS FUNNEL — live pipeline counts from /api/jobs/discovered
+    // (stats_by_status). Read-only; refreshes every 15s. Shows where every
+    // job Job Scout found ended up: filtered out, LLM-rejected, scored, notified.
+    // ===================================================================
+    (function () {
+      "use strict";
+      const rowsEl = document.getElementById('jf-rows');
+      function row(label, count, total, cls) {
+        const pct = total > 0 ? Math.max(2, Math.round((count / total) * 100)) : 0;
+        return (
+          '<div class="jf-row"><div class="jf-top"><span>' + label + '</span>' +
+          '<b>' + count + '</b></div>' +
+          '<div class="jf-bar"><div class="jf-fill ' + cls + '" style="width:' + pct + '%"></div></div></div>'
+        );
+      }
+      function refresh() {
+        fetch('/api/jobs/discovered?limit=1')
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data) => {
+            const s = (data && data.stats_by_status) || {};
+            const filter = s.rejected_by_filter || 0;
+            const llm = s.rejected_by_llm || 0;
+            const scored = s.scored || 0;
+            const notified = s.notified || 0;
+            const pending = s.discovered || 0;
+            const total = filter + llm + scored + notified + pending;
+            if (!total) {
+              rowsEl.innerHTML = '<div class="jf-empty">No jobs discovered yet. Job Scout runs on a schedule.</div>';
+              return;
+            }
+            rowsEl.innerHTML =
+              row('Found', total, total, 'jf-found') +
+              row('Filter-rejected', filter, total, 'jf-filter') +
+              row('LLM-rejected', llm, total, 'jf-llm') +
+              row('Scored', scored, total, 'jf-scored') +
+              row('Notified', notified, total, 'jf-notified');
+          })
+          .catch(() => { rowsEl.innerHTML = '<div class="jf-empty">Pipeline unavailable.</div>'; });
+      }
+      refresh();
+      setInterval(refresh, 15000);
     })();
   </script>
 

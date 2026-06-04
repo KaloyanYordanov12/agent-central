@@ -135,3 +135,12 @@ unreachable ("Reconnecting to the live feed..."). It polls `/health` every 4s an
 reads `window.AGENT_LIVE` for offline agents. Verified live with Deal Hunter
 offline (its :8000 service not running). Screenshot: `a4-banner-zoom.png`.
 
+### D3 jobs funnel (shipped)
+
+A top-right "Jobs pipeline" panel with staged proportional bars read live from
+`/api/jobs/discovered` (`stats_by_status`), refreshed every 15s: Found (total),
+Filter-rejected, LLM-rejected, Scored, Notified. Friendly empty state when no jobs
+exist yet. Read-only. Verified with real data: Found 164, Filter-rejected 34,
+LLM-rejected 124, Scored 3, Notified 0. Screenshots: `d3-full.png`,
+`d3-funnel-zoom.png`.
+
