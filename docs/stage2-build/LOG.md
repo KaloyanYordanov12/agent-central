@@ -125,3 +125,13 @@ backdrop click, or Escape; remembered in `localStorage` (`ac_onboarded_v1`) so
 returning viewers are not nagged. `window.showOnboarding()` exposed for a future
 help button / verification. Screenshot: `a1-onboarding.png`.
 
+### A4 honest offline / reconnecting banner (shipped)
+
+A calm top-center banner (never alarming red) that only appears when something is
+down, and distinguishes two cases: (1) an agent is offline because its external
+service is not running ("Deal Hunter is offline: that scanner runs as a separate
+service. The rest of the office is live.") vs (2) the observatory itself is
+unreachable ("Reconnecting to the live feed..."). It polls `/health` every 4s and
+reads `window.AGENT_LIVE` for offline agents. Verified live with Deal Hunter
+offline (its :8000 service not running). Screenshot: `a4-banner-zoom.png`.
+

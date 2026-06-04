@@ -364,6 +364,21 @@
       border-radius: 6px; cursor: pointer;
     }
     .onboard-card button:hover { background: #ffce5c; }
+
+    /* A4 honest offline / reconnecting banner (calm, never alarming red) */
+    .offline-banner {
+      position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 880;
+      max-width: 620px; background: rgba(20, 24, 32, 0.92);
+      border: 1px solid rgba(255, 176, 0, 0.4); border-radius: 20px;
+      padding: 6px 15px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px;
+      color: #ffd27a; display: flex; align-items: center; gap: 9px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+    .offline-banner.hidden { display: none; }
+    .offline-banner .ob-dot { width: 8px; height: 8px; border-radius: 50%;
+      background: #9aa2b4; flex: none; }
+    .offline-banner.reconnecting { border-color: #ffb000; }
+    .offline-banner.reconnecting .ob-dot { background: #ffb000; animation: tk-pulse 1.2s ease-in-out infinite; }
   </style>
 </head>
 <body>
@@ -387,6 +402,11 @@
   <div class="popup" id="popup" style="display: none;">
     <button class="popup-close" id="popup-close">×</button>
     <div class="popup-content" id="popup-content"></div>
+  </div>
+
+  <!-- A4 honest offline / reconnecting banner (only shows when something is down) -->
+  <div class="offline-banner hidden" id="offline-banner">
+    <span class="ob-dot"></span><span id="ob-text"></span>
   </div>
 
   <!-- A1 cold-open onboarding card: what this is, that it is real, click anything -->
@@ -1188,6 +1208,53 @@
         if (e.key === 'Escape' && !overlay.classList.contains('hidden')) dismiss();
       });
       window.showOnboarding = show;   // for verification / a future "help" button
+    })();
+  </script>
+
+  <script>
+    // ===================================================================
+    // A4 HONEST OFFLINE / RECONNECTING BANNER — distinguishes a deliberately
+    // offline agent (its external service is not running; the rest is live)
+    // from the observatory itself being unreachable (reconnecting). Never red.
+    // ===================================================================
+    (function () {
+      "use strict";
+      const NAMES = { deal_hunter: 'Deal Hunter', job_scout: 'Job Scout',
+                      job_analyst: 'Job Analyst', secretary: 'Secretary' };
+      const banner = document.getElementById('offline-banner');
+      const textEl = document.getElementById('ob-text');
+      if (!banner) return;
+
+      function setBanner(mode, text) {
+        if (!mode) { banner.classList.add('hidden'); return; }
+        banner.classList.remove('hidden');
+        banner.classList.toggle('reconnecting', mode === 'reconnecting');
+        textEl.textContent = text;
+      }
+
+      function offlineAgents() {
+        const live = window.AGENT_LIVE || {};
+        return Object.keys(live).filter((id) => (live[id] || {}).state === 'offline');
+      }
+
+      function tick() {
+        fetch('/health', { cache: 'no-store' })
+          .then((r) => { if (!r.ok) throw new Error('bad'); return r.json(); })
+          .then(() => {
+            // Observatory is reachable. Only an external agent service may be down.
+            const off = offlineAgents();
+            if (!off.length) { setBanner(null); return; }
+            const names = off.map((id) => NAMES[id] || id).join(', ');
+            const who = off.length === 1 ? (names + ' is offline') : (names + ' are offline');
+            setBanner('offline', who + ': that scanner runs as a separate service. The rest of the office is live.');
+          })
+          .catch(() => {
+            // The observatory itself is unreachable: reconnecting, not broken.
+            setBanner('reconnecting', 'Reconnecting to the live feed...');
+          });
+      }
+      tick();
+      setInterval(tick, 4000);
     })();
   </script>
 
