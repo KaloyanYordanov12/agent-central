@@ -51,3 +51,12 @@ gap), and constrained the banner to a center lane (max-width min(560px,
 calc(100vw - 540px))) so it can never reach the left HUD or the right stack at any
 common width. Verified: banner right 954, cost left 1116 (162px clear); cost/funnel
 gap 10px. Screenshot: p1-topbar-fixed.png.
+
+### P1.2 agent name-label overlap fixed
+Name labels collided when agents stood close. Fix: collision-aware label layout in
+render() that, after sorting by depth, stacks each label upward (3px gap) until it
+clears any already-placed label whose box it would overlap. Added drawLabelAt() for
+explicit positioning and a window.__freeze hook (also used by replay) for
+deterministic capture. Verified by forcing three agents onto one spot: labels
+"Deal Hunter / Job Scout / Job Analyst" stagger and stay legible.
+Screenshot: p1-labels-staggered.png.

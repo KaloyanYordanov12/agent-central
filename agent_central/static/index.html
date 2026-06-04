@@ -883,6 +883,13 @@
       ctx.strokeStyle=color; ctx.lineWidth=1; ctx.strokeRect(x+0.5,y+0.5,w-1,h-1);
       ctx.fillStyle='rgba(10,12,18,0.92)'; ctx.beginPath(); ctx.moveTo(cx-3,y+h);ctx.lineTo(cx+3,y+h);ctx.lineTo(cx,y+h+4);ctx.closePath();ctx.fill();
       ctx.fillStyle=color; ctx.fillText(name,cx,y+h/2+0.5); ctx.globalAlpha=1; }
+    // Draw a name label at an explicit top-left box position (collision-aware layout).
+    function drawLabelAt(ctx,cx,y,w,h,name,color,dim){ const x=cx-w/2;
+      ctx.globalAlpha=dim?0.5:1;
+      ctx.fillStyle='rgba(10,12,18,0.92)'; ctx.fillRect(x,y,w,h);
+      ctx.strokeStyle=color; ctx.lineWidth=1; ctx.strokeRect(x+0.5,y+0.5,w-1,h-1);
+      ctx.fillStyle='rgba(10,12,18,0.92)'; ctx.beginPath(); ctx.moveTo(cx-3,y+h);ctx.lineTo(cx+3,y+h);ctx.lineTo(cx,y+h+4);ctx.closePath();ctx.fill();
+      ctx.fillStyle=color; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(name,cx,y+h/2+0.5); ctx.globalAlpha=1; }
 
     let off,octx,view,vctx;
     function render(){
@@ -906,12 +913,25 @@
       vctx.imageSmoothingEnabled=false; vctx.clearRect(0,0,NW*S,NH*S); vctx.drawImage(off,0,0,NW,NH,0,0,NW*S,NH*S);
       for(const ag of order){
         if(ag.glow){ vctx.strokeStyle=ag.col; vctx.lineWidth=2; vctx.strokeRect((ag.x-13)*S, (ag.y-30)*S, 26*S, 32*S); }
-        drawLabel(vctx, ag.x, ag.y-28, ag.name, ag.col, ag.mode==='offline');
+      }
+      // Collision-aware name labels: when two agents are adjacent their labels
+      // would overlap, so stagger the later one upward until it clears.
+      vctx.font='bold 10px JetBrains Mono, monospace';
+      const placed=[];
+      for(const ag of order){
+        const w=Math.ceil(vctx.measureText(ag.name).width)+8, h=14, cx=ag.x*S;
+        let y=(ag.y-28)*S-7-h;
+        for(let g=0; g<8; g++){ let hit=false;
+          for(const p of placed){ if(Math.abs(cx-p.cx)<(w+p.w)/2 && y<p.y+p.h+2 && y+h>p.y-2){ y=p.y-h-3; hit=true; } }
+          if(!hit) break; }
+        placed.push({cx,y,w,h});
+        drawLabelAt(vctx, cx, y, w, h, ag.name, ag.col, ag.mode==='offline');
       }
     }
 
     let last=0;
-    function loop(now){ const dt=Math.min(0.05,(now-last)/1000||0); last=now; update(dt); render(); requestAnimationFrame(loop); }
+    // __freeze pauses live movement (used for replay takeover + deterministic shots)
+    function loop(now){ const dt=Math.min(0.05,(now-last)/1000||0); last=now; if(!window.__freeze) update(dt); render(); requestAnimationFrame(loop); }
 
     function connectWS(){
       const wsProto = location.protocol==='https:'?'wss:':'ws:';
@@ -949,6 +969,7 @@
     const AGENT_LIVE = {};                                  // latest {state,action} per agent from WS
     window.AGENT_LIVE = AGENT_LIVE;                          // exposed for the live-status HUD (A3)
     window.ROOMS = ROOMS; window.SCALE = S;                  // exposed for the room-label overlay (A2)
+    window.AGENTS_SIM = AGENTS; window.NODE_POS = NODE;       // exposed for replay (C) + label-layout checks
     const POPUP_FN = { job_scout:'openJobScoutPopup', job_analyst:'openJobAnalystPopup', secretary:'openSecretaryPopup' };
     function showInfo(title, body, cx, cy){
       const POP=document.getElementById('popup'), POPC=document.getElementById('popup-content');
