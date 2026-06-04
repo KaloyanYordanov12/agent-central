@@ -179,3 +179,33 @@ def test_llm_costs_today_excludes_yesterday(client, temp_activity_db):
     data = client.get("/api/llm-costs/today").json()
     assert data["call_count"] == 1
     assert abs(data["total_usd"] - 0.003) < 1e-9
+
+
+def _insert_failed_llm_call(db, agent_id="job_analyst", model="claude-haiku-4-5",
+                            timestamp=None):
+    ts = timestamp or (_today() + "T10:30:00+00:00")
+    conn = sqlite3.connect(db)
+    try:
+        conn.execute(
+            "INSERT INTO llm_calls (timestamp, agent_id, model, purpose, input_tokens, "
+            "output_tokens, cache_creation_tokens, cache_read_tokens, estimated_cost_usd, "
+            "duration_ms, ok, error, metadata) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (ts, agent_id, model, "score_job", 0, 0, 0, 0, 0.0, 12, 0,
+             "credit balance is too low", None),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def test_llm_costs_today_counts_failures_separately(client, temp_activity_db):
+    """F1: failed calls must not be folded into call_count at $0; they are a
+    distinct error_count, and spend/tokens come only from successful calls."""
+    _insert_llm_call(temp_activity_db, "job_analyst", "claude-haiku-4-5", 0.002)
+    for _ in range(4):
+        _insert_failed_llm_call(temp_activity_db)
+    data = client.get("/api/llm-costs/today").json()
+    assert data["call_count"] == 1          # only the successful call
+    assert data["error_count"] == 4         # the four failures, surfaced honestly
+    assert abs(data["total_usd"] - 0.002) < 1e-9
+    assert data["input_tokens"] == 100 and data["output_tokens"] == 20

@@ -397,12 +397,18 @@
         .then((data) => {
           if (!data) return;
           const el = document.getElementById('cost-today-indicator');
-          if (el) {
-            const usd = (data.total_usd || 0).toFixed(4);
-            el.textContent = `LLM today: $${usd} (${data.call_count || 0} calls)`;
-          }
+          if (!el) return;
+          const usd = (data.total_usd || 0).toFixed(4);
+          const ok = data.call_count || 0;
+          const errs = data.error_count || 0;
+          // Honest: successful spend + ok-call count, with failures flagged
+          // separately instead of being counted as free "calls".
+          let txt = `LLM today: $${usd} (${ok} ok call${ok === 1 ? '' : 's'})`;
+          if (errs) txt += ` · ${errs} failed`;
+          el.textContent = txt;
+          el.style.color = errs ? '#ffd27a' : '#f4f0e0';
         })
-        .catch(() => { /* silent — don't break the UI */ });
+        .catch(() => { /* silent, do not break the UI */ });
     }
     refreshCostIndicator();
     setInterval(refreshCostIndicator, 60000);
@@ -784,12 +790,15 @@
       fetch('/api/llm-costs/today').then(r=>r.ok?r.json():null).then(d=>{
         const POPC=document.getElementById('popup-content');
         if(!d){ POPC.innerHTML='<div class="popup-title">CONTROL · LIVE STATS</div><span class="sec-error">stats unavailable</span>'; return; }
-        const usd=(d.total_usd||0).toFixed(4); let b='LLM spend today: $'+usd+'\nCalls logged: '+(d.call_count||0)+'\nDate (UTC): '+(d.date||'-');
+        const usd=(d.total_usd||0).toFixed(4); const ok=d.call_count||0, errs=d.error_count||0;
+        const tin=d.input_tokens||0, tout=d.output_tokens||0;
+        let b='LLM spend today: $'+usd+'\nSuccessful calls: '+ok+'\nFailed calls: '+errs+'\nTokens (in/out): '+tin+' / '+tout+'\nDate (UTC): '+(d.date||'-');
         const ba=d.by_agent||{}, ak=Object.keys(ba);
         if(ak.length) b+='\n\nBy agent:\n'+ak.map(k=>'  '+k+': $'+(+ba[k]).toFixed(4)).join('\n');
         const bm=d.by_model||{}, mk=Object.keys(bm);
         if(mk.length) b+='\n\nBy model:\n'+mk.map(k=>'  '+k+': $'+(+bm[k]).toFixed(4)).join('\n');
-        if(!ak.length) b+='\n\n(No LLM calls logged today yet. The ticker is\nwatching, though.)';
+        if(!ok && errs) b+='\n\n('+errs+' calls failed today and 0 succeeded.\nUsually an empty API credit balance; the Analyst\npauses itself when this happens.)';
+        else if(!ok && !errs) b+='\n\n(No LLM calls logged today yet. The ticker is\nwatching, though.)';
         POPC.innerHTML='<div class="popup-title">CONTROL · LIVE STATS</div>'+b;
       }).catch(()=>{ const POPC=document.getElementById('popup-content'); POPC.innerHTML='<div class="popup-title">CONTROL · LIVE STATS</div><span class="sec-error">stats unavailable</span>'; });
     }

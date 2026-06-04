@@ -374,18 +374,29 @@ def get_costs_today(db_path: Optional[str] = None) -> dict:
     conn.row_factory = sqlite3.Row
     try:
         rows = conn.execute(
-            "SELECT agent_id, model, estimated_cost_usd FROM llm_calls "
+            "SELECT agent_id, model, estimated_cost_usd, ok, "
+            "input_tokens, output_tokens FROM llm_calls "
             "WHERE substr(timestamp, 1, 10) = ?",
             (today,),
         ).fetchall()
     finally:
         conn.close()
 
-    by_agent, by_model, total, count = {}, {}, 0.0, 0
+    # Honest split: successful calls carry the real spend/tokens; failed calls
+    # (for example an empty credit balance) are counted separately, not folded
+    # into call_count at $0 where they read as "free calls that did nothing".
+    by_agent, by_model = {}, {}
+    total, ok_count, error_count = 0.0, 0, 0
+    input_tokens, output_tokens = 0, 0
     for r in rows:
-        count += 1
+        if not r["ok"]:
+            error_count += 1
+            continue
+        ok_count += 1
         cost = r["estimated_cost_usd"] or 0.0
         total += cost
+        input_tokens += r["input_tokens"] or 0
+        output_tokens += r["output_tokens"] or 0
         by_agent[r["agent_id"]] = round(by_agent.get(r["agent_id"], 0.0) + cost, 8)
         by_model[r["model"]] = round(by_model.get(r["model"], 0.0) + cost, 8)
     return {
@@ -393,5 +404,8 @@ def get_costs_today(db_path: Optional[str] = None) -> dict:
         "total_usd": round(total, 8),
         "by_agent": by_agent,
         "by_model": by_model,
-        "call_count": count,
+        "call_count": ok_count,        # successful calls only
+        "error_count": error_count,    # failed calls (for example empty credit)
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
     }

@@ -60,5 +60,22 @@ Real API calls spent: 1 (of a hard ceiling of 10). No further real calls will be
 made; all server runs below use ANTHROPIC_API_KEY unset so the analyst pauses
 (F4) and spends nothing.
 
+### F1 honest cost ticker (shipped)
+
+- `activity_log.get_costs_today` now splits successful from failed calls:
+  `total_usd`, `call_count` and `by_agent`/`by_model` come from ok=1 calls only;
+  failures are a separate `error_count`; added `input_tokens`/`output_tokens`.
+  Failed calls (for example empty credit) used to be counted as free "calls".
+- Ticker now reads e.g. `LLM today: $0.0681 (35 ok calls) - 3500 failed` and turns
+  amber when there are failures. The Control live-stats popup shows spend,
+  successful calls, failed calls, token in/out, and a plain-language note that
+  many-failures-zero-success usually means empty credit and the analyst pauses.
+- Test added (`test_llm_costs_today_counts_failures_separately`). Suite: 101 passed.
+- Verified live: with real data (35 ok / 3500 failed today), ticker and popup show
+  the honest split. Screenshots: `f1-01-office-ticker.png`, `f1-02-control-stats.png`.
+
 ## Phase 2: legibility bundle (no real API calls)
+
+All server runs use ANTHROPIC_API_KEY unset, so the analyst pauses (F4) and the
+office is driven purely by reads of existing activity-log / jobs data over the WS.
 
