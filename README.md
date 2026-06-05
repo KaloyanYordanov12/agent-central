@@ -2,9 +2,9 @@
 
 > A real-time observatory for AI agents at work. Watch your agents like you'd watch your colleagues across the office floor — see what they're doing, when, and where.
 
-![Agent Central: the live office, the metrics dashboard, and REPLAY mode](docs/stage4-build/hero-demo.gif)
+![Agent Central: the live office and the metrics dashboard](docs/stage5-build/hero-demo.gif)
 
-*A live capture of the current build: the live office with the status HUD, ticker and jobs funnel; the metrics dashboard; and REPLAY mode scrubbing through a recorded day.*
+*A live capture of the current build: the live office with the status HUD, ticker and jobs funnel, then the metrics dashboard.*
 
 **Run it:** locally on `127.0.0.1:8001` (see "Running it locally"). Public demos have used ephemeral cloudflared quick-tunnels, so there is no permanent hosted link.
 **Built:** May to June 2026, ~48 hours from skeleton to shipped
@@ -37,9 +37,8 @@ The deeper design idea: agents are workers. They have shifts, tasks, downtime. V
 - **Maps agent state to physical zones** in a pixel-art office (operations, communications, writing desk, research, lounge)
 - **Drives an autonomous character** that walks between zones, takes elevators between floors
 - **Surfaces live state everywhere you look:** an always-on status strip (one row per agent with state, current action, and "updated Ns ago"), a scrolling activity ticker narrating real events from the activity log, a jobs pipeline funnel, labelled rooms, and a work bubble above an agent when it is at a desk
-- **Offers clickable elements** with popups: each agent, in-world flavor objects, and a dedicated terminal
-- **Opens a real metrics dashboard** (click the in-world LIVE METRICS terminal): LLM tokens, latency, success vs error rate, per-model and per-agent breakdowns, calls and tokens per day, and how long each agent spent in each state, all read from the activity log and recorded LLM calls
-- **Replays the recorded day**: a clearly-badged REPLAY mode re-drives the office from real recorded events with a timeline scrubber and play/pause/speed, so the agents re-enact their history (a replay of real telemetry, never fabricated)
+- **Offers clickable elements** with popups: each agent, in-world flavor objects, and the control-room screens
+- **Opens a real metrics dashboard** (click the upper-floor Control screens): LLM tokens, latency, success vs error rate, per-model and per-agent breakdowns, calls and tokens per day, and how long each agent spent in each state, all read from the activity log and recorded LLM calls
 - **Onboards a cold viewer** with a dismissible intro card, and **degrades honestly**: an offline agent dims and a calm banner explains its separate service is not running (offline, not broken)
 
 ---
@@ -139,13 +138,13 @@ The Ask tab requires `ANTHROPIC_API_KEY` to be set in the environment (a missing
 
 ### Demo
 
-The GIF at the top of this README is a live capture of the current build: the live office with the status HUD, ticker and jobs funnel, the metrics dashboard, and REPLAY mode scrubbing through a recorded day. Clone the repo and start the server to explore it; the Secretary character is at the lower-left, ready to click.
+The GIF at the top of this README is a live capture of the current build: the live office with the status HUD, ticker and jobs funnel, and the metrics dashboard. Clone the repo and start the server to explore it; the Secretary character is at the lower-left, ready to click.
 
 ---
 
 ## Status
 
-**What works:** Everything in this README. The system runs, the agents walk between rooms, the popups open, the always-on status HUD and activity ticker track live state, the jobs funnel shows the real pipeline, the in-world terminal opens a real metrics dashboard, REPLAY mode re-enacts the recorded day, and the test suite is green.
+**What works:** Everything in this README. The system runs, the agents walk between rooms, the popups open, the always-on status HUD and activity ticker track live state, the jobs funnel shows the real pipeline, the Control screens open a real metrics dashboard, and the test suite is green.
 
 **What's pending:** Deal Hunter's Reddit scanner is currently blocked on a 403 from Reddit's CDN; they have tightened their bot detection beyond what a header workaround can solve. Restoring it requires either PRAW pre-approval (Reddit's official policy, a multi-week approval process) or rotating residential proxies. The architecture is platform-agnostic: once data flows in, the visualization pipeline reacts in real time.
 
