@@ -56,7 +56,9 @@ def _profile(tmp_path):
 def test_all_cases_have_valid_expected():
     valid = {"high", "low", "filtered", "deduped"}
     assert all(c.expected in valid for c in ANALYST_CASES)
-    assert len(ANALYST_CASES) >= 12  # spec aims for ~12-20
+    # After Kolio's review removed the two flagged cases: 5 HIGH + 5 LOW + 4
+    # FILTERED + 1 DEDUPED = 15, all clear-cut.
+    assert len(ANALYST_CASES) == 15
 
 
 def test_band_case_titles_are_not_title_filtered():
@@ -77,11 +79,14 @@ def test_filtered_cases_are_actually_filtered_by_title():
             assert job_scout.apply_title_filters(job) is not None, c.id
 
 
-def test_needs_review_cases_are_flagged_and_listed():
-    flagged = analyst_cases.needs_review_cases()
-    ids = {c.id for c in flagged}
-    assert ids == {"se2_mid_level_ambiguous", "spanish_junior_python"}
-    assert all(c.needs_review for c in flagged)
+def test_suite_is_fully_clear_cut_zero_needs_review():
+    # Kolio reviewed both flagged cases and had them removed, so the suite is now
+    # fully clear-cut: no case is flagged and the two removed ids are gone.
+    assert analyst_cases.needs_review_cases() == []
+    assert not any(c.needs_review for c in ANALYST_CASES)
+    ids = {c.id for c in ANALYST_CASES}
+    assert "se2_mid_level_ambiguous" not in ids
+    assert "spanish_junior_python" not in ids
 
 
 def test_provenance_label_is_honest():

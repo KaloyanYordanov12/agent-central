@@ -40,13 +40,21 @@ and the URL dedup in job_scout.store_jobs. We deliberately do NOT assert behavio
 the system does not have (e.g. there is no non-English language filter today), so
 no check here can pass for a reason that is not really implemented.
 
-CASES CURRENTLY FLAGGED FOR HUMAN REVIEW (needs_review=True):
-  - se2_mid_level_ambiguous : "Software Engineer II" sits between junior and
-       senior; the right band is genuinely arguable. Flagged.
-  - spanish_junior_python   : a junior Python role posted in Spanish. On merit it
-       matches, but there is no decided policy for non-English posts, so the
-       expected category is not self-evident. Flagged.
-Everything else is intended to be clear-cut. If you disagree with any "clear-cut"
+CASES FLAGGED FOR HUMAN REVIEW: resolved by Kolio. Both were REMOVED, so the suite
+now has zero needs_review cases and is fully clear-cut. Kolio's fit criterion is
+REQUIREMENTS-based, not level-based ("it does not matter if the job is junior or
+mid, only whether I meet the requirements"), and he reads only English and
+Bulgarian (any other language is a reject).
+  - se2_mid_level_ambiguous : REMOVED. It tested a junior-vs-mid LEVEL distinction,
+       which is not Kolio's criterion, and as written it had no hard blocker (only
+       a soft experience preference), making it a MODERATE match that fits neither
+       the clear-cut HIGH nor LOW band. It does not belong in a clear-cut suite.
+  - spanish_junior_python   : REMOVED. Kolio decided non-English postings are a
+       reject, but the system has no language filter today, and this suite's rule
+       is to never assert a behavior the system does not have. A proper clear-cut
+       'filtered' case will be added once that filter is built (a separate
+       fix-phase feature); it is intentionally not added or built here.
+Everything here is intended to be clear-cut. If you disagree with any "clear-cut"
 case, set human_reviewed=True (and adjust) and it will relabel itself in the UI.
 =============================================================================
 """
@@ -289,45 +297,18 @@ _DEDUPED = [
 ]
 
 # ---------------------------------------------------------------------------
-# NEEDS REVIEW: genuinely not-obviously-clear-cut. Flagged for a human (Kolio).
-# Best-guess expected band is recorded, but it is explicitly uncertain.
+# NEEDS REVIEW: empty. Kolio reviewed the two cases that lived here and had both
+# REMOVED (se2_mid_level_ambiguous tested level rather than his requirements-based
+# criterion and was only a moderate match; spanish_junior_python would require a
+# non-English filter the system does not have yet). See the header for details.
+# The list stays defined (empty) so the suite is documented as fully clear-cut.
 # ---------------------------------------------------------------------------
-_NEEDS_REVIEW = [
-    AnalystCase(
-        id="se2_mid_level_ambiguous",
-        title="Software Engineer II",
-        expected="low",
-        rationale="'Engineer II' usually implies ~2-4 years, sitting between the "
-                  "profile's junior level and the senior no-go. The right band is "
-                  "arguable, so this is flagged for human review rather than guessed.",
-        description=(
-            "Software Engineer II on a Python backend team. Typically suits someone "
-            "with a couple of years of professional experience. Remote within the EU."
-        ),
-        needs_review=True,
-    ),
-    AnalystCase(
-        id="spanish_junior_python",
-        title="Ingeniero Junior de Python (Remoto)",
-        expected="high",
-        rationale="On merit this is a junior remote Python role (a HIGH match), but "
-                  "it is written in Spanish and there is no decided policy for "
-                  "non-English posts, so the expected category is not self-evident. "
-                  "Flagged for human review.",
-        company="Startup de IA",
-        location="Remoto (UE)",
-        description=(
-            "Buscamos un ingeniero JUNIOR de Python (0-2 anos) para construir "
-            "aplicaciones con modelos de lenguaje (LLM) y FastAPI. Totalmente "
-            "remoto en la UE. No se requiere experiencia senior."
-        ),
-        needs_review=True,
-    ),
-]
+_NEEDS_REVIEW = []
 
 
 # The fixed, version-controlled case set. Order is stable for reproducibility.
-ANALYST_CASES = _HIGH + _LOW + _FILTERED + _DEDUPED + _NEEDS_REVIEW
+# All clear-cut, all asserting real behavior; zero needs_review cases.
+ANALYST_CASES = _HIGH + _LOW + _FILTERED + _DEDUPED
 
 # Bands that require a real LLM scoring call (the only cases that can spend).
 SCORING_EXPECTED = ("high", "low")
