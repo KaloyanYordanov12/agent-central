@@ -51,6 +51,9 @@ JOB_ANALYST_INTERVAL_SECONDS = 300  # 5 minutes — usually fast no-ops
 JOB_ANALYST_SCORE_THRESHOLD = 75
 PROFILE_PATH = os.path.join(_PROJECT_ROOT, "data", "profile.yaml")
 
+# --- Evaluator config (new agent): the honest eval harness ---
+EVAL_SCORECARD_PATH = os.path.join(_PROJECT_ROOT, "data", "eval_scorecard.json")
+
 
 class IndexerTask:
     """Background task that periodically indexes activity_log events into the
@@ -496,6 +499,85 @@ def metrics(days: int = 14):
     except Exception:
         logger.exception("metrics failed")
         raise HTTPException(status_code=500, detail="failed to compute metrics")
+
+
+# --- Evaluator: the honest eval harness (scorecard backend) ---
+# True while a run is in flight, so the POST endpoint rejects a concurrent run
+# rather than double-spending. Module-level (single-process) like the other tasks.
+_eval_running = False
+
+
+def _build_eval_scorecard() -> dict:
+    """Run the full eval suite under the SpendGuard caps and return the scorecard.
+
+    This is the ONLY spending path in the eval feature. It wires the live Secretary
+    (for groundedness) and the live Job Analyst client (for the categorical cases);
+    both raise RuntimeError if ANTHROPIC_API_KEY is missing (surfaced as 503). Kept
+    as a separate function so endpoint tests can patch it and spend nothing.
+    """
+    from agent_central.eval import scorecard, runner as eval_runner
+    from agent_central import secretary, job_analyst
+
+    client, embedding_service, vector_index = _get_secretary_deps()  # raises w/o key
+    analyst_client = job_analyst.JobAnalystClient()                  # raises w/o key
+
+    def ask_fn(question: str) -> dict:
+        return secretary.ask_secretary(
+            question, vector_index, embedding_service, client, top_k=5,
+        )
+
+    guard = eval_runner.make_guard()
+    return scorecard.run_full_suite(
+        PROFILE_PATH, activity_log._DB_PATH, ask_fn, analyst_client, guard=guard,
+    )
+
+
+@app.get("/api/eval/scorecard")
+def eval_scorecard_get():
+    """Latest persisted scorecard, or an honest 'never run' state if none exists."""
+    from agent_central.eval import scorecard
+    card = scorecard.load_scorecard(EVAL_SCORECARD_PATH)
+    if card is None:
+        return {
+            "status": "never_run",
+            "generated_at": None,
+            "message": "No eval has run yet. Run the suite to generate a scorecard "
+                       "(this spends a little, under hard caps).",
+        }
+    return card
+
+
+@app.post("/api/eval/run")
+async def eval_run():
+    """Run the full eval suite once, under the caps, then persist + return it."""
+    global _eval_running
+    if _eval_running:
+        raise HTTPException(status_code=409, detail="An eval run is already in progress.")
+    _eval_running = True
+    try:
+        activity_log.log_event("evaluator", "state_change", state="running-evals",
+                               metadata={"event": "run_start"})
+    except Exception:
+        logger.exception("evaluator state (running-evals) failed")
+    try:
+        card = await asyncio.to_thread(_build_eval_scorecard)
+    except RuntimeError as e:
+        # Missing/invalid API key: the suite cannot spend, so it cannot run.
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception:
+        logger.exception("eval run failed")
+        raise HTTPException(status_code=500, detail="eval run failed")
+    finally:
+        _eval_running = False
+        try:
+            activity_log.log_event("evaluator", "state_change", state="idle",
+                                   metadata={"event": "run_done"})
+        except Exception:
+            logger.exception("evaluator state (idle) failed")
+
+    from agent_central.eval import scorecard
+    scorecard.save_scorecard(card, EVAL_SCORECARD_PATH)
+    return card
 
 
 # Serve the command center UI
