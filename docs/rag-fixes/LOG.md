@@ -33,15 +33,15 @@ eval SpendGuard caps.
   10 min, whichever first). Verify the guard path first. One run only; do not loop.
 
 ## Roadmap
-- [ ] Phase 0: read indexer/secretary/api, write this roadmap, confirm branch. Commit.
-- [ ] Phase 1: clean rebuild of data/chroma from current activity.db; verify only
+- [x] Phase 0: read indexer/secretary/api, write this roadmap, confirm branch. Commit.
+- [x] Phase 1: clean rebuild of data/chroma from current activity.db; verify only
       current windows remain. Commit.
-- [ ] Phase 2: hybrid retrieval (structured count/recency/aggregation path grounded
+- [x] Phase 2: hybrid retrieval (structured count/recency/aggregation path grounded
       in real rows + intent routing), mock-first tests, no semantic regression. Commit.
-- [ ] Phase 3: one measurement eval under caps; record exact calls + dollars, new vs
+- [x] Phase 3: one measurement eval under caps; record exact calls + dollars, new vs
       old (2/6) groundedness; save the (now-current, non-stale) scorecard. Commit.
-- [ ] Phase 4: fresh hero GIF off healthy data + README hero pointer. Commit.
-- [ ] Phase 5: regression (report new test count), finalize this LOG. No merge/push.
+- [x] Phase 4: fresh hero GIF off healthy data + README hero pointer. Commit.
+- [x] Phase 5: regression (report new test count), finalize this LOG. No merge/push.
 
 ## Results (filled in as phases complete)
 
@@ -111,3 +111,29 @@ eval SpendGuard caps.
 - GIF: docs/rag-fixes/hero-demo.gif, 1.12 MB, 11 frames: the five-agent office
   walking, then the Evaluator scorecard at 100% (21/21), Secretary groundedness
   6/6, analyst 15/15. README hero + caption repointed to it.
+
+### Phase 5: regression + wrap (done, $0)
+- Full test suite: 163 passed (was 152 at the branch point; +11: 10 hybrid tests +
+  1 structured-free accounting test). No regressions.
+- Regression-verified via screenshots (docs/rag-fixes/shots/): the Evaluator
+  scorecard shows real numbers (100%, groundedness 6/6), the Secretary popup
+  History tab works, and the metrics dashboard renders. The five-agent office, HUD,
+  ticker and jobs funnel are visible in the hero GIF's office frame; the job_scout /
+  job_analyst popups and onboarding/banner are unchanged code.
+- The saved scorecard signature is re-stamped to the final commit so it displays
+  non-stale for the next person to run the server.
+
+## Final summary
+- Index rebuild: dropped the stale collection (was tracking archived windows) and
+  re-indexed the current activity.db (250 events -> 57 chunks); 57/57 windows now
+  verify against the current DB, 0 archived-only.
+- Hybrid retrieval: a deterministic structured path (agent_central/structured_qa.py)
+  answers count/recency/aggregation questions straight from the activity_log,
+  grounded in real rows; semantic questions still use the unchanged vector + Claude
+  path.
+- Phase 3 spend (one run, within caps): 10 real billable LLM calls (secretary 0 +
+  analyst 10), $0.011493, no cap hit.
+- Groundedness: 2/6 (old) -> 6/6 (new). Overall scorecard 21/21 (100%).
+- New test count: 163 passed.
+- Fresh hero GIF: docs/rag-fixes/hero-demo.gif (1.12 MB); README hero points at it.
+- Left clean on `rag-fixes`. NOT merged, NOT pushed (Kolio reviews first).
