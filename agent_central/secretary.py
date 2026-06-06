@@ -101,12 +101,24 @@ def _score_from_distance(distance) -> Optional[float]:
 
 
 def ask_secretary(question: str, vector_index, embedding_service,
-                  secretary_client, top_k: int = 5) -> dict:
-    """End-to-end: embed question -> retrieve top-K -> ask Claude -> compose response.
+                  secretary_client, top_k: int = 5, db_path: str = None) -> dict:
+    """End-to-end hybrid Q&A: structured path first, else vector RAG.
 
-    Returns {answer, sources, model, input_tokens, output_tokens}. If the index
-    has no matching chunks, returns a no-data answer WITHOUT calling the LLM.
+    Returns {answer, sources, model, input_tokens, output_tokens}. Count / recency /
+    aggregation questions are answered directly from the activity_log (the
+    structured path, no LLM call), grounded in real rows. Everything else falls
+    through to the existing vector retrieval + Claude path, which is unchanged. If
+    the index has no matching chunks, returns a no-data answer WITHOUT calling the
+    LLM. db_path defaults to the active activity_log DB.
     """
+    from agent_central import structured_qa, activity_log
+
+    if db_path is None:
+        db_path = activity_log._DB_PATH
+    structured = structured_qa.structured_answer(question, db_path)
+    if structured is not None:
+        return structured
+
     embeddings = embedding_service.embed_texts([question])
     q_embedding = embeddings[0] if embeddings else []
 

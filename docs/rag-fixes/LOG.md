@@ -55,8 +55,29 @@ eval SpendGuard caps.
   floors the first real event at 18:50. A live semantic retrieval returned only
   current (06-05) job_scout windows. The index and activity_log are now consistent.
 
-### Phase 2: hybrid-retrieval design
-(to be filled)
+### Phase 2: hybrid-retrieval design (done, $0)
+- New module agent_central/structured_qa.py: a deterministic structured path that
+  answers count / recency / aggregation questions directly from the activity_log
+  with SQL queries, grounding each answer in the real rows it used (sources are
+  1-second windows around the actual events, so they verify against the DB).
+- Intent routing (lightweight, keyword-based):
+  - recency ("most recent / latest / current state ...") -> most recent state for a
+    named agent, or the agent/event of the single most recent row.
+  - count ("how many / number of ...") -> errors in a window, an agent's scoring
+    passes (state_change to 'scanning'), or generic event counts.
+  - aggregation (plural "agents" + an activity word) -> distinct active agents in a
+    window. The plural guard keeps single-agent semantic questions on the vector path.
+  - time windows: today / this week / all-time.
+- ask_secretary now tries structured_answer first; if it returns None (semantic
+  question) it falls through to the UNCHANGED vector + Claude path. New optional
+  db_path arg defaults to the active activity_log DB.
+- Honesty: zero-count answers say "0 / no errors" with no fabricated sources; an
+  agent with no recorded state says so; truly empty data abstains.
+- Tests: tests/test_secretary_hybrid.py (10 tests, $0) cover recency, count,
+  zero-count, agent-passes, active-agents, no-data, that a semantic question is NOT
+  structured, that the structured path never calls the LLM, and that a semantic
+  question still uses the vector path. Sources are checked with the eval's own
+  verify_source. Full suite: 162 passed.
 
 ### Phase 3: measurement eval (the only spend)
 (to be filled)
