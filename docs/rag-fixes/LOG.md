@@ -101,5 +101,13 @@ eval SpendGuard caps.
   signature, clearing the "stale" state. (Re-stamped at the end of the pass so it
   stays non-stale after later docs/asset commits.)
 
-### Phase 4: fresh hero GIF
-(to be filled)
+### Phase 4: fresh hero GIF (done, $0)
+- Captured with docs/rag-fixes/gif_hero.py (one headless-Chrome CDP session,
+  onboarding dismissed, Pillow assembly + palette quantize), server running
+  key-unset (no spend; the current scorecard JSON was already saved).
+- The scorecard signature was re-stamped to the current HEAD first
+  (docs/rag-fixes/restamp_scorecard.py, $0, results unchanged) so the GIF shows the
+  real numbers, not the "stale" state.
+- GIF: docs/rag-fixes/hero-demo.gif, 1.12 MB, 11 frames: the five-agent office
+  walking, then the Evaluator scorecard at 100% (21/21), Secretary groundedness
+  6/6, analyst 15/15. README hero + caption repointed to it.

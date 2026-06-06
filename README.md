@@ -2,9 +2,9 @@
 
 > A real-time observatory for AI agents at work. Watch your agents like you'd watch your colleagues across the office floor — see what they're doing, when, and where.
 
-![Agent Central: the live office and the metrics dashboard](docs/stage5-build/hero-demo.gif)
+![Agent Central: the live office and the Evaluator scorecard](docs/rag-fixes/hero-demo.gif)
 
-*A live capture of the current build: the live office with the status HUD, ticker and jobs funnel, then the metrics dashboard.*
+*A live capture of the current build: the five-agent office with the status HUD, ticker and jobs funnel, then the Evaluator's honest scorecard showing real current numbers (Secretary groundedness now 6/6 after the hybrid-retrieval fix).*
 
 **Run it:** locally on `127.0.0.1:8001` (see "Running it locally"). Public demos have used ephemeral cloudflared quick-tunnels, so there is no permanent hosted link.
 **Built:** May to June 2026, ~48 hours from skeleton to shipped
@@ -139,7 +139,7 @@ The Ask tab requires `ANTHROPIC_API_KEY` to be set in the environment (a missing
 
 ### Demo
 
-The GIF at the top of this README is a live capture of the current build: the live office with the status HUD, ticker and jobs funnel, and the metrics dashboard. Clone the repo and start the server to explore it; the Secretary character is at the lower-left, ready to click.
+The GIF at the top of this README is a live capture of the current build: the five-agent office with the status HUD, ticker and jobs funnel, then the Evaluator's scorecard showing real current numbers. Clone the repo and start the server to explore it; the Secretary character is at the lower-left, ready to click, and the Evaluator is in the Control room.
 
 ---
 
