@@ -1,4 +1,4 @@
-"""Evaluator agent — an honest eval harness for Agent Central.
+"""Evaluator agent -- an honest eval harness for Agent Central.
 
 Two ground-truth regimes, kept methodologically honest:
 

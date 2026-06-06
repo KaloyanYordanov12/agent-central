@@ -39,6 +39,7 @@ The deeper design idea: agents are workers. They have shifts, tasks, downtime. V
 - **Surfaces live state everywhere you look:** an always-on status strip (one row per agent with state, current action, and "updated Ns ago"), a scrolling activity ticker narrating real events from the activity log, a jobs pipeline funnel, labelled rooms, and a work bubble above an agent when it is at a desk
 - **Offers clickable elements** with popups: each agent, in-world flavor objects, and the control-room screens
 - **Opens a real metrics dashboard** (click the upper-floor Control screens): LLM tokens, latency, success vs error rate, per-model and per-agent breakdowns, calls and tokens per day, and how long each agent spent in each state, all read from the activity log and recorded LLM calls
+- **Runs an honest eval harness** (the Evaluator agent): a fixed, grounded suite that scores the other agents and reports a real scorecard with a ground-truth provenance label on every check (computed-from-data vs clear-cut model-drafted), the actual failing cases, and the real spend, all under hard cost caps
 - **Onboards a cold viewer** with a dismissible intro card, and **degrades honestly**: an offline agent dims and a calm banner explains its separate service is not running (offline, not broken)
 
 ---
@@ -71,7 +72,7 @@ Two-service distributed system:
 - **Backend:** FastAPI, uvicorn, websockets, httpx
 - **Frontend:** vanilla HTML/CSS/JS with a hand-rolled HTML5 canvas renderer (no framework)
 - **Art:** Custom pixel art from [rixitic](https://rixitic.itch.io/) (interior tileset, $1 strategic asset purchase) + [2dPig](https://2dpig.itch.io/) (character sprites) + AI-generated background
-- **Testing:** pytest, pytest-asyncio (100+ backend tests covering the API, status polling, WebSocket, activity logging, the background indexer, the RAG endpoint, the jobs/cost endpoints, and the Job Analyst including its backoff; CI-validated)
+- **Testing:** pytest, pytest-asyncio (150+ backend tests covering the API, status polling, WebSocket, activity logging, the background indexer, the RAG endpoint, the jobs/cost endpoints, the Job Analyst including its backoff, and the eval harness: the DB-computed groundedness graders, the clear-cut categorical cases, the SpendGuard caps including a zero-call safety test, and the scorecard endpoints; CI-validated)
 - **CI:** GitHub Actions, runs tests on every push and PR
 - **Deployment:** uvicorn locally; past public demos used ephemeral cloudflared quick-tunnels, so there is no permanent hosted URL
 
@@ -109,7 +110,7 @@ pip install -r requirements-dev.txt
 pytest tests/ -v
 ```
 
-The test suite covers backend endpoints (`/health`, `/api/agents`, static serving), the WebSocket connection lifecycle, the `broadcast()` helper, the `StatusPoller` initial state, the agent-state / `STATE_TO_ZONE` contracts, the activity log (SQLite IPC + `/api/secretary/history`), the background indexer (chunking, summarization, embeddings, vector store, index-pass idempotency), and the Secretary RAG layer (`/api/secretary/ask`, with the Anthropic client mocked — no real API calls). CI runs them on every push and PR via GitHub Actions.
+The test suite covers backend endpoints (`/health`, `/api/agents`, static serving), the WebSocket connection lifecycle, the `broadcast()` helper, the `StatusPoller` initial state, the agent-state / `STATE_TO_ZONE` contracts, the activity log (SQLite IPC + `/api/secretary/history`), the background indexer (chunking, summarization, embeddings, vector store, index-pass idempotency), the Secretary RAG layer (`/api/secretary/ask`, with the Anthropic client mocked, no real API calls), and the Evaluator eval harness (groundedness graders against DB-computed truth, the clear-cut categorical cases, the SpendGuard caps with a zero-call safety test, the auto-run skip-if-unchanged logic, and the scorecard endpoints, all mocked). CI runs them on every push and PR via GitHub Actions.
 
 Frontend tests (canvas scene, browser automation) are intentionally out of scope for this iteration. The visual layer is verified by hand and with scripted Chrome DevTools Protocol screenshots instead.
 
@@ -139,6 +140,30 @@ The Ask tab requires `ANTHROPIC_API_KEY` to be set in the environment (a missing
 ### Demo
 
 The GIF at the top of this README is a live capture of the current build: the live office with the status HUD, ticker and jobs funnel, and the metrics dashboard. Clone the repo and start the server to explore it; the Secretary character is at the lower-left, ready to click.
+
+---
+
+## Evaluator
+
+The Evaluator is an agent inside Agent Central that runs a fixed, honestly-grounded eval suite against the other agents and reports a real scorecard. Click the magenta "Evaluator" character (it works in the Control room) to open the scorecard panel.
+
+![The Evaluator scorecard: overall pass rate, per-agent results, and a ground-truth provenance label on every check](docs/eval-build/shots/scorecard_phase7.png)
+
+The whole point of the Evaluator is methodological honesty about where each check's "ground truth" comes from. Every check is labelled with its provenance, and there are exactly two honest sources:
+
+1. **Computed from activity_log (objective).** The Secretary groundedness questions have answers computed directly from the SQLite activity data with code. The database is the ground truth, never a model's opinion. The grader also verifies that every source the Secretary cites is a real window with real events; a cited window that does not exist is counted as a hallucination. This needs no human labelling, and it is immune to the one real risk of using a model as judge: Opus and Haiku are both Claude and could share a blind spot, but a value read straight from the data cannot.
+
+2. **Model-drafted (Opus 4.8), clear-cut.** The Job Analyst cases were drafted at full effort by a stronger model (Opus 4.8) judging a weaker one (Haiku, which the graded agents run on). Stronger-model-as-judge is a legitimate technique, and two rules keep it defensible here: the ground truth is only the expected category / band (high / low / filtered / deduped), never a precise model-picked number; and every case is kept clear-cut (a plumbing job must score low for a software profile), so who drafted it stops mattering. Any case that is not obviously clear-cut is flagged `needs_review` for a human, and a case a human has actually checked is relabelled "human-reviewed". The reviewable cases live in `agent_central/eval/analyst_cases.py`.
+
+A same-tier model's subjective fine-grained score is never treated as truth, and a check's provenance is never labelled dishonestly.
+
+### How it works, and what it costs
+
+- **Haiku only, behind hard caps.** The suite reuses the same `SpendGuard` as the Job Analyst: a full run stops at about $0.50 / 50 calls / 10 minutes, whichever comes first, checked before every call. Behavior cases (title-filtered, deduped) cost nothing because they assert the system's real filter/dedup behavior with no LLM call.
+- **Building it spends $0.** The whole unit-test suite runs on mocked clients / fixtures, including a zero-call-guard safety test; only a real run spends, and only under the caps.
+- **On-demand is the primary path.** The "Run evals" button calls `POST /api/eval/run`. An infrequent auto-run (about once a day) also runs it, but skips if nothing relevant changed (no new commit, no profile edit, already ran today), so it never re-spends to reconfirm an unchanged suite. `GET /api/eval/scorecard` returns the latest result, or an honest "never run" state. The run path needs `ANTHROPIC_API_KEY`; without it the scorecard still displays and the rest of the office still works.
+
+The scorecard shows the overall pass rate, per-agent results, and the actual failing cases (the question or case, the expected truth, what the agent said, and why it failed), each next to its provenance label. In the latest run the Job Analyst categorical suite passed 16 of 17 clear-cut cases, while the Secretary groundedness checks surfaced real, honestly-measured RAG weaknesses rather than a flattering number.
 
 ---
 

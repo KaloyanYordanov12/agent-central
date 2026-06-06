@@ -63,7 +63,7 @@ def _agent_group(agent_id: str) -> list:
 
 
 # ----------------------------------------------------------------------------
-# Truth functions — each reads the real activity_log and returns the true answer.
+# Truth functions -- each reads the real activity_log and returns the true answer.
 # ----------------------------------------------------------------------------
 def truth_agents_active_today(db_path: str) -> list:
     """Synonym-groups for every distinct agent with an event logged today (UTC)."""

@@ -1,4 +1,4 @@
-"""Eval suite runner — executes the graded suite under hard SpendGuard caps.
+"""Eval suite runner -- executes the graded suite under hard SpendGuard caps.
 
 Phase 1 wires the Secretary groundedness portion. The analyst categorical portion
 and the combined scorecard are added in later phases. The SpendGuard reused here
