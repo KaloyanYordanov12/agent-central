@@ -170,9 +170,28 @@
     }).join("");
   }
 
+  function renderStale(card) {
+    const msg = (card && card.message)
+      ? card.message
+      : "The eval suite changed since this scorecard was generated.";
+    const last = (card && card.generated_at)
+      ? '<br><span class="ae-note">Last run: ' + escapeHtml(fmtTs(card.generated_at)) +
+        "</span>"
+      : "";
+    $("eval-scorecard").innerHTML =
+      '<div class="ask-empty"><b>This scorecard is out of date.</b><br>' +
+      escapeHtml(msg) + last +
+      '<br><span class="ae-note">Click Run evals to refresh.</span></div>';
+    $("eval-failing").innerHTML = '<div class="sec-muted">No current results.</div>';
+  }
+
   function render(card) {
     if (!card || card.status === "never_run") {
       renderNeverRun();
+      return;
+    }
+    if (card.status === "stale") {
+      renderStale(card);
       return;
     }
     renderScorecard(card);

@@ -552,8 +552,15 @@ def _build_eval_scorecard() -> dict:
 
 @app.get("/api/eval/scorecard")
 def eval_scorecard_get():
-    """Latest persisted scorecard, or an honest 'never run' state if none exists."""
-    from agent_central.eval import scorecard
+    """Latest persisted scorecard, or an honest 'never run' / 'stale' state.
+
+    If the suite or profile changed since the saved scorecard was generated (its
+    stored signature no longer matches the current one), we return a 'stale' state
+    instead of the now-outdated numbers/flags, so the UI never shows results (or
+    needs_review counts) that no longer reflect the current suite. Refreshing it is
+    a real run; this read path never spends.
+    """
+    from agent_central.eval import scorecard, autorun
     card = scorecard.load_scorecard(EVAL_SCORECARD_PATH)
     if card is None:
         return {
@@ -561,6 +568,15 @@ def eval_scorecard_get():
             "generated_at": None,
             "message": "No eval has run yet. Run the suite to generate a scorecard "
                        "(this spends a little, under hard caps).",
+        }
+    if card.get("signature") != autorun.compute_signature(PROFILE_PATH):
+        return {
+            "status": "stale",
+            "generated_at": card.get("generated_at"),
+            "message": "The eval suite changed since this scorecard was generated "
+                       "(a new commit or an edited profile). Re-run the suite to "
+                       "refresh; the previous result is hidden to avoid showing "
+                       "stale numbers or flagged cases that no longer exist.",
         }
     return card
 

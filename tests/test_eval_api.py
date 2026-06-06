@@ -9,7 +9,7 @@ import json
 import pytest
 
 from agent_central import api, activity_log
-from agent_central.eval import scorecard
+from agent_central.eval import scorecard, autorun
 from agent_central.job_analyst import SpendGuard
 
 
@@ -79,6 +79,38 @@ def test_scorecard_endpoint_never_run(client, tmp_path, monkeypatch):
     resp = client.get("/api/eval/scorecard")
     assert resp.status_code == 200
     assert resp.json()["status"] == "never_run"
+
+
+def test_scorecard_endpoint_reports_stale_when_signature_changed(client, tmp_path, monkeypatch):
+    # A saved scorecard whose signature predates a suite/profile change must NOT be
+    # shown with its now-outdated numbers or flagged-case counts.
+    path = str(tmp_path / "eval_scorecard.json")
+    monkeypatch.setattr(api, "EVAL_SCORECARD_PATH", path)
+    card = scorecard.build_scorecard(_fake_sections(),
+                                     generated_at="2026-06-06T11:39:00+00:00")
+    card["signature"] = {"commit": "OLDCOMMIT", "profile_hash": "OLDHASH"}
+    scorecard.save_scorecard(card, path)
+
+    body = client.get("/api/eval/scorecard").json()
+    assert body["status"] == "stale"
+    assert body["generated_at"] == "2026-06-06T11:39:00+00:00"
+    # The stale response must not leak the old needs_review/flagged data.
+    assert "needs_review" not in body
+    assert "sections" not in body
+
+
+def test_scorecard_endpoint_returns_card_when_signature_current(client, tmp_path, monkeypatch):
+    path = str(tmp_path / "eval_scorecard.json")
+    monkeypatch.setattr(api, "EVAL_SCORECARD_PATH", path)
+    card = scorecard.build_scorecard(_fake_sections(),
+                                     generated_at="2026-06-06T12:00:00+00:00")
+    card["signature"] = autorun.compute_signature(api.PROFILE_PATH)  # matches now
+    scorecard.save_scorecard(card, path)
+
+    body = client.get("/api/eval/scorecard").json()
+    assert body.get("status") != "stale"
+    assert body["generated_at"] == "2026-06-06T12:00:00+00:00"
+    assert body["overall"]["total"] == 4
 
 
 def test_run_endpoint_persists_and_returns(client, tmp_path, temp_activity_db, monkeypatch):
