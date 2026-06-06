@@ -54,7 +54,7 @@ class StatusPoller:
 
     # Stationary agents whose live state is derived from activity_log rather
     # than a dashboard endpoint. Deal Hunter is added separately from /status.
-    DERIVED_AGENTS = ("job_scout", "job_analyst", "secretary")
+    DERIVED_AGENTS = ("job_scout", "job_analyst", "secretary", "evaluator")
 
     async def _broadcast_agent_states(self, deal_hunter_status: dict):
         """Emit a unified 'agent_states' message alongside the legacy 'status'.

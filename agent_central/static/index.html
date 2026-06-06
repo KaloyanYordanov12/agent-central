@@ -713,6 +713,7 @@
       poster5:'objects/Poster_5.png', poster6:'objects/Poster_6.png', poster7:'objects/Poster_7.png', clock:'objects/Clock_1_red.png',
       stairs:'infrastructure/Stairs.png',
       deal_hunter:'npc/deal_hunter.png', job_scout:'npc/job_scout.png', job_analyst:'npc/job_analyst.png', secretary:'npc/secretary.png',
+      evaluator:'npc/evaluator.png',
     };
     const IMG = {};
 
@@ -842,6 +843,7 @@
       job_scout:   {scanning:'BROWSE'},
       job_analyst: {scanning:'THINKING'},
       secretary:   {answering:'COMMS'},
+      evaluator:   {'running-evals':'THINKING'},
     };
     function directiveFor(id,state){
       if(state==='offline') return {kind:'offline'};
@@ -857,6 +859,7 @@
       { id:'job_scout',   name:'Job Scout',   sheet:'job_scout',   col:'#5fd0ff', speed:54 },
       { id:'job_analyst', name:'Job Analyst', sheet:'job_analyst', col:'#ff8a72', speed:44 },
       { id:'secretary',   name:'Secretary',   sheet:'secretary',   col:'#c79bff', speed:50 },
+      { id:'evaluator',   name:'Evaluator',   sheet:'evaluator',   col:'#ff6bce', speed:46 },
     ];
     const byId = {};
     const claimed = {};                 // station node -> agent id
@@ -882,6 +885,7 @@
     // backend state through these into the sim (state = destination).
     const jobScoutWalker   = { setState:(s)=>setBackendState('job_scout', s) };
     const jobAnalystWalker = { setState:(s)=>setBackendState('job_analyst', s) };
+    const evaluatorWalker  = { setState:(s)=>setBackendState('evaluator', s) };
 
     function advance(ag,dt){
       let move=ag.speed*dt;
@@ -1018,6 +1022,7 @@
           if(msg.agents.job_scout)   jobScoutWalker.setState(msg.agents.job_scout.state);
           if(msg.agents.job_analyst) jobAnalystWalker.setState(msg.agents.job_analyst.state);
           if(msg.agents.secretary)   setBackendState('secretary', msg.agents.secretary.state);
+          if(msg.agents.evaluator)   evaluatorWalker.setState(msg.agents.evaluator.state);
         }
       }catch(e){ console.error('[WS] parse', e); } };
       ws.onclose = ()=>{ console.warn('[WS] disconnected, retry 3s'); setTimeout(connectWS,3000); };
@@ -1025,7 +1030,7 @@
     }
 
     function initAgents(){
-      const starts={deal_hunter:'LOUNGE_W', job_scout:'BR3', job_analyst:'LIB_C', secretary:'CTRL_C'};
+      const starts={deal_hunter:'LOUNGE_W', job_scout:'BR3', job_analyst:'LIB_C', secretary:'CTRL_C', evaluator:'CTRL_R'};
       let i=0;
       for(const ag of AGENTS){ byId[ag.id]=ag; const n=starts[ag.id]; ag.cur=n; ag.x=NODE[n][0]; ag.y=NODE[n][1];
         ag.mode='roam'; ag.sub='pause'; ag.pauseT=0.2+0.3*i; ag.path=null; ag.pi=0; ag.frac=0; ag.dist=0; ag.face=false; ag.onStair=false; ag.moving=false;
@@ -1041,7 +1046,7 @@
     window.AGENT_LIVE = AGENT_LIVE;                          // exposed for the live-status HUD (A3)
     window.ROOMS = ROOMS; window.SCALE = S;                  // exposed for the room-label overlay (A2)
     window.AGENTS_SIM = AGENTS; window.NODE_POS = NODE;       // debug hooks for deterministic screenshots / label-layout checks
-    const POPUP_FN = { job_scout:'openJobScoutPopup', job_analyst:'openJobAnalystPopup', secretary:'openSecretaryPopup' };
+    const POPUP_FN = { job_scout:'openJobScoutPopup', job_analyst:'openJobAnalystPopup', secretary:'openSecretaryPopup', evaluator:'openEvaluatorPopup' };
     function showInfo(title, body, cx, cy){
       const POP=document.getElementById('popup'), POPC=document.getElementById('popup-content');
       POPC.innerHTML=(title?'<div class="popup-title">'+title+'</div>':'')+body; POP.style.display='block';
@@ -1121,6 +1126,7 @@
       window.setSecretaryGlow=(on)=>{ if(byId.secretary) byId.secretary.glow=!!on; };
       window.setJobScoutGlow=(on)=>{ if(byId.job_scout) byId.job_scout.glow=!!on; };
       window.setJobAnalystGlow=(on)=>{ if(byId.job_analyst) byId.job_analyst.glow=!!on; };
+      window.setEvaluatorGlow=(on)=>{ if(byId.evaluator) byId.evaluator.glow=!!on; };
       initAgents(); connectWS(); requestAnimationFrame(loop);
     }
 
@@ -1136,9 +1142,11 @@
     (function () {
       "use strict";
       const NAMES = { deal_hunter: 'Deal Hunter', job_scout: 'Job Scout',
-                      job_analyst: 'Job Analyst', secretary: 'Secretary' };
+                      job_analyst: 'Job Analyst', secretary: 'Secretary',
+                      evaluator: 'Evaluator' };
       const COLORS = { deal_hunter: '#ffce5c', job_scout: '#5fd0ff',
-                       job_analyst: '#ff8a72', secretary: '#c79bff' };
+                       job_analyst: '#ff8a72', secretary: '#c79bff',
+                       evaluator: '#ff6bce' };
       const STATE_VERB = {
         scanning: 'started scanning', qualifying: 'is qualifying a lead',
         author_research: 'is researching', writing: 'is writing a draft',
@@ -1146,6 +1154,7 @@
         answering: 'is answering a question', idle: 'went idle',
         offline: 'went offline', online: 'came online', error: 'hit an error',
         paused: 'paused itself (misconfigured)',
+        'running-evals': 'is running evals',
       };
       const content = document.getElementById('tk-content');
 
@@ -1229,6 +1238,7 @@
         { id: 'job_scout',   name: 'Job Scout',   col: '#5fd0ff' },
         { id: 'job_analyst', name: 'Job Analyst', col: '#ff8a72' },
         { id: 'secretary',   name: 'Secretary',   col: '#c79bff' },
+        { id: 'evaluator',   name: 'Evaluator',   col: '#ff6bce' },
       ];
       const STATE_LABEL = {
         scanning: 'Scanning', qualifying: 'Qualifying a lead',
@@ -1236,9 +1246,10 @@
         critic: 'Reviewing a draft', posting: 'Posting',
         answering: 'Answering', idle: 'Idle', offline: 'Offline',
         online: 'Online', error: 'Error', paused: 'Paused (misconfigured)',
+        'running-evals': 'Running evals',
       };
       const ACTIVE = new Set(['scanning', 'qualifying', 'author_research', 'writing',
-                              'critic', 'posting', 'answering', 'online']);
+                              'critic', 'posting', 'answering', 'online', 'running-evals']);
       function dotClass(state) {
         if (!state) return 's-wait';
         if (state === 'offline') return 's-offline';
@@ -1356,7 +1367,8 @@
     (function () {
       "use strict";
       const NAMES = { deal_hunter: 'Deal Hunter', job_scout: 'Job Scout',
-                      job_analyst: 'Job Analyst', secretary: 'Secretary' };
+                      job_analyst: 'Job Analyst', secretary: 'Secretary',
+                      evaluator: 'Evaluator' };
       const banner = document.getElementById('offline-banner');
       const textEl = document.getElementById('ob-text');
       const closeBtn = document.getElementById('ob-close');
@@ -1460,7 +1472,7 @@
     // ===================================================================
     (function () {
       "use strict";
-      const AGENT_COL = { deal_hunter: '#ffce5c', job_scout: '#5fd0ff', job_analyst: '#ff8a72', secretary: '#c79bff' };
+      const AGENT_COL = { deal_hunter: '#ffce5c', job_scout: '#5fd0ff', job_analyst: '#ff8a72', secretary: '#c79bff', evaluator: '#ff6bce' };
       const body = document.getElementById('dash-body');
       const popup = document.getElementById('dashboard-popup');
       const fmtInt = (n) => (n || 0).toLocaleString();

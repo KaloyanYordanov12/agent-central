@@ -294,6 +294,13 @@ async def lifespan(app: FastAPI):
         profile_path=PROFILE_PATH,
     )
     await _job_analyst.start()
+    # Announce the Evaluator so it appears in the office + activity log from boot,
+    # even before any eval has run (it sits idle until triggered).
+    try:
+        activity_log.log_event("evaluator", "lifecycle", state="idle",
+                               metadata={"event": "first_seen"})
+    except Exception:
+        logger.exception("evaluator first_seen log failed")
     try:
         yield
     finally:
