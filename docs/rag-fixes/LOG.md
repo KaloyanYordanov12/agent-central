@@ -45,8 +45,15 @@ eval SpendGuard caps.
 
 ## Results (filled in as phases complete)
 
-### Phase 1: index rebuild
-(to be filled)
+### Phase 1: index rebuild (done, $0)
+- Tool: docs/rag-fixes/rebuild_index.py (uses the app's own indexer + the local
+  embedding model; never touches activity.db or the archive).
+- Dropped the stale collection (163 active chunks, tracking archived windows) and
+  re-indexed the current activity.db: 250 events -> 57 chunks.
+- Verified: 57/57 indexed windows correspond to real events in the current
+  activity.db (0 archived-only windows remain); earliest window 2026-06-04T18:45
+  floors the first real event at 18:50. A live semantic retrieval returned only
+  current (06-05) job_scout windows. The index and activity_log are now consistent.
 
 ### Phase 2: hybrid-retrieval design
 (to be filled)
