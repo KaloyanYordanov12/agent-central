@@ -94,6 +94,10 @@ def test_run_endpoint_persists_and_returns(client, tmp_path, temp_activity_db, m
     assert body["generated_at"] == "2026-06-06T12:00:00+00:00"
     assert body["overall"]["total"] == 4
 
+    # The endpoint stamps a change-signature so the auto-run can skip-if-unchanged.
+    assert "signature" in body
+    assert set(body["signature"].keys()) == {"commit", "profile_hash"}
+
     # Persisted: the GET now returns the same scorecard.
     got = client.get("/api/eval/scorecard")
     assert got.status_code == 200

@@ -53,6 +53,10 @@ PROFILE_PATH = os.path.join(_PROJECT_ROOT, "data", "profile.yaml")
 
 # --- Evaluator config (new agent): the honest eval harness ---
 EVAL_SCORECARD_PATH = os.path.join(_PROJECT_ROOT, "data", "eval_scorecard.json")
+# Auto-run checks infrequently (a few times a day) and runs at most once/day, only
+# when something relevant changed (see eval/autorun.py). Long interval so we never
+# re-spend on a cadence; on-demand via POST /api/eval/run is the primary path.
+EVAL_AUTORUN_INTERVAL_SECONDS = 6 * 3600
 
 
 class IndexerTask:
@@ -272,11 +276,12 @@ _poller: StatusPoller | None = None
 _indexer: "IndexerTask | None" = None
 _job_scout: "JobScoutTask | None" = None
 _job_analyst: "JobAnalystTask | None" = None
+_evaluator: "EvaluatorTask | None" = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _poller, _indexer, _job_scout, _job_analyst
+    global _poller, _indexer, _job_scout, _job_analyst, _evaluator
     # Ensure the activity-log DB + schema (incl. discovered_jobs) exist first.
     activity_log.init_db(activity_log.DEFAULT_DB_PATH)
     _poller = StatusPoller(broadcast_fn=broadcast)
@@ -301,9 +306,15 @@ async def lifespan(app: FastAPI):
                                metadata={"event": "first_seen"})
     except Exception:
         logger.exception("evaluator first_seen log failed")
+    _evaluator = EvaluatorTask(
+        profile_path=PROFILE_PATH,
+        scorecard_path=EVAL_SCORECARD_PATH,
+    )
+    await _evaluator.start()
     try:
         yield
     finally:
+        await _evaluator.stop()
         await _job_analyst.stop()
         await _job_scout.stop()
         await _indexer.stop()
@@ -582,9 +593,88 @@ async def eval_run():
         except Exception:
             logger.exception("evaluator state (idle) failed")
 
-    from agent_central.eval import scorecard
+    from agent_central.eval import scorecard, autorun
+    # Stamp the signature so the auto-run can later tell if anything changed.
+    card["signature"] = autorun.compute_signature(PROFILE_PATH)
     scorecard.save_scorecard(card, EVAL_SCORECARD_PATH)
     return card
+
+
+class EvaluatorTask:
+    """Background auto-run for the eval suite: infrequent + skip-if-unchanged.
+
+    Wakes every EVAL_AUTORUN_INTERVAL_SECONDS (waiting one interval first, so it
+    never fires at boot), then runs the suite ONLY when autorun.should_autorun says
+    something relevant changed and it has not already run today. Requires an API
+    key (it spends); with no key it skips silently. Reuses _build_eval_scorecard
+    and the shared _eval_running flag so it never double-spends with a manual run.
+    """
+
+    def __init__(self, profile_path: str, scorecard_path: str,
+                 interval_seconds: int = EVAL_AUTORUN_INTERVAL_SECONDS):
+        self.profile_path = profile_path
+        self.scorecard_path = scorecard_path
+        self.interval_seconds = interval_seconds
+        self._task: Optional[asyncio.Task] = None
+
+    async def start(self):
+        self._task = asyncio.create_task(self._loop())
+        logger.info("EvaluatorTask started (auto-run, infrequent + skip-if-unchanged)")
+
+    async def stop(self):
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            logger.info("EvaluatorTask stopped")
+
+    async def _loop(self):
+        while True:
+            await asyncio.sleep(self.interval_seconds)  # wait first: no boot-time run
+            try:
+                await asyncio.to_thread(self._maybe_run)
+            except Exception:
+                logger.exception("Evaluator auto-run failed; will retry next cycle")
+
+    def _maybe_run(self):
+        from datetime import datetime, timezone
+        from agent_central.eval import autorun, scorecard as sc
+
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            return  # cannot spend without a key; on-demand path will surface 503
+        card = sc.load_scorecard(self.scorecard_path)
+        signature = autorun.compute_signature(self.profile_path)
+        today = datetime.now(timezone.utc).date().isoformat()
+        run, reason = autorun.should_autorun(card, signature, today)
+        if not run:
+            logger.info(f"[evaluator] auto-run skipped: {reason}")
+            return
+
+        global _eval_running
+        if _eval_running:
+            logger.info("[evaluator] auto-run skipped: a run is already in progress")
+            return
+        _eval_running = True
+        logger.info(f"[evaluator] auto-run starting: {reason}")
+        try:
+            activity_log.log_event("evaluator", "state_change", state="running-evals",
+                                   metadata={"event": "autorun_start", "reason": reason})
+        except Exception:
+            logger.exception("evaluator autorun state log failed")
+        try:
+            new_card = _build_eval_scorecard()
+            new_card["signature"] = signature
+            sc.save_scorecard(new_card, self.scorecard_path)
+            logger.info("[evaluator] auto-run complete")
+        finally:
+            _eval_running = False
+            try:
+                activity_log.log_event("evaluator", "state_change", state="idle",
+                                       metadata={"event": "autorun_done"})
+            except Exception:
+                logger.exception("evaluator autorun idle log failed")
 
 
 # Serve the command center UI
