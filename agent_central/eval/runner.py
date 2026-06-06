@@ -77,7 +77,10 @@ def run_secretary_groundedness(db_path: str, ask_fn, guard=None,
                 "provenance": q.provenance,
             })
             continue
-        if guard is not None:
+        # The hybrid Secretary may answer count/recency/aggregation from the DB
+        # (the structured path) with NO LLM call. Those are free, so they do not
+        # count toward the billable call/cost caps; only real LLM answers are recorded.
+        if guard is not None and sec.get("path") != "structured":
             _record_cost(guard, model, sec)
         results.append(grader.grade_groundedness(q, truth, sec, db_path))
 

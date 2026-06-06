@@ -201,6 +201,27 @@ def test_run_secretary_groundedness_mocked_no_spend(tmp_path):
     assert guard.cost > 0
 
 
+def test_structured_answers_are_free_and_dont_consume_the_guard(tmp_path):
+    """Hybrid structured answers make no LLM call, so they must not count toward
+    the billable call/cost caps even though they are still graded."""
+    db = _seed_db(tmp_path)
+
+    def ask_fn(text):
+        # Mimic the structured path: a grounded answer with a real source, no LLM.
+        return {"answer": "Active today: Job Scout, Job Analyst, Deal Hunter. 1 error. "
+                          "Job Scout is idle. Job Analyst is idle. The most recent event "
+                          "was Job Analyst. The Job Analyst started 1 pass.",
+                "sources": [_real_source("job_analyst")], "model": None,
+                "input_tokens": 0, "output_tokens": 0, "path": "structured"}
+
+    guard = runner.make_guard()
+    out = runner.run_secretary_groundedness(db, ask_fn, guard=guard)
+    assert out["summary"]["total"] == len(questions.GROUNDEDNESS_QUESTIONS)
+    assert guard.calls == 0     # structured answers are free
+    assert guard.cost == 0.0
+    assert out["capped"] is None
+
+
 def test_run_groundedness_zero_call_guard_spends_nothing(tmp_path):
     """The critical safety check: a 0-call guard makes the runner ask nothing."""
     db = _seed_db(tmp_path)

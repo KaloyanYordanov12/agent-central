@@ -79,8 +79,27 @@ eval SpendGuard caps.
   question still uses the vector path. Sources are checked with the eval's own
   verify_source. Full suite: 162 passed.
 
-### Phase 3: measurement eval (the only spend)
-(to be filled)
+### Phase 3: measurement eval (the only spend) (done)
+- ONE run, standalone (no server, so no background analyst), via
+  docs/rag-fixes/run_eval.py against the rebuilt data/chroma + the hybrid Secretary,
+  under the eval SpendGuard caps ($0.50 / 50 calls / 600s). No cap hit.
+- EXACT spend:
+  - REAL billable LLM calls: 10  (secretary 0 + analyst 10). All 6 Secretary
+    groundedness questions were answered by the free structured path with NO LLM
+    call; the 10 analyst calls are the 5 HIGH + 5 LOW scoring cases (the 5 filtered
+    + 1 deduped behavior cases make no call).
+  - Estimated USD: $0.011493 (Haiku).
+  - (The guard counted 16 "attempts" because it also gated the 6 free structured
+    answers; those cost $0. Runner fixed this pass so structured answers no longer
+    count toward billable calls/cost; the saved scorecard's call count is the true
+    billable 10. No re-run was done to fix this.)
+- GROUNDEDNESS: 2/6 (old, pre-fix) -> 6/6 (new). The hybrid structured path now
+  answers every count/recency/aggregation question correctly and grounded in real
+  rows that verify against the DB.
+- Analyst categorical: 15/15. OVERALL: 21/21 (100%).
+- Scorecard saved to data/eval_scorecard.json (gitignored) stamped with the current
+  signature, clearing the "stale" state. (Re-stamped at the end of the pass so it
+  stays non-stale after later docs/asset commits.)
 
 ### Phase 4: fresh hero GIF
 (to be filled)
