@@ -287,6 +287,55 @@
     .ask-empty { color: rgba(244, 240, 224, 0.7); font-size: 12px; line-height: 1.6; padding: 4px 2px; }
     .ask-empty .ae-eg { color: #ffd27a; }
     .ask-empty .ae-note { color: rgba(255, 176, 0, 0.5); font-size: 11px; }
+
+    /* Evaluator scorecard (console tier) */
+    .eval-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .eval-run-btn {
+      font-family: inherit; font-size: 12px; font-weight: 700; padding: 7px 14px;
+      background: #ffb000; color: #1a1305; border: none; border-radius: 4px; cursor: pointer;
+    }
+    .eval-run-btn:disabled { opacity: 0.5; cursor: default; }
+    .eval-overall {
+      display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+      padding: 8px 0 10px; border-bottom: 1px solid rgba(255, 176, 0, 0.18); margin-bottom: 8px;
+    }
+    .eval-rate { font-size: 26px; font-weight: 700; color: #ffd27a; }
+    .eval-rate-sub { font-size: 12px; color: rgba(244, 240, 224, 0.7); }
+    .eval-spend { font-size: 11px; color: rgba(255, 176, 0, 0.6); }
+    .eval-section-head {
+      margin: 12px 0 4px; font-size: 12px; font-weight: 700; color: #ffd27a;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .eval-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .pass-pill, .fail-pill {
+      display: inline-block; min-width: 38px; text-align: center; font-weight: 700;
+      font-size: 10px; padding: 1px 6px; border-radius: 3px;
+    }
+    .pass-pill { background: rgba(43, 214, 111, 0.18); color: #5ee79a; border: 1px solid rgba(43, 214, 111, 0.5); }
+    .fail-pill { background: rgba(255, 85, 85, 0.15); color: #ff8585; border: 1px solid rgba(255, 85, 85, 0.5); }
+    .prov-badge {
+      display: inline-block; font-size: 9.5px; padding: 1px 6px; border-radius: 8px;
+      border: 1px solid; white-space: nowrap;
+    }
+    /* Objective = computed from data (strongest). Model = clear-cut Opus draft.
+       Human = a case a person actually reviewed. Each is colored distinctly. */
+    .prov-objective { color: #5ee7d0; border-color: rgba(94, 231, 208, 0.6); background: rgba(63, 227, 203, 0.10); }
+    .prov-model { color: #ffce5c; border-color: rgba(255, 176, 0, 0.5); background: rgba(255, 176, 0, 0.08); }
+    .prov-human { color: #5fd0ff; border-color: rgba(95, 208, 255, 0.5); background: rgba(95, 208, 255, 0.10); }
+    .nr-flag {
+      display: inline-block; font-size: 9.5px; padding: 1px 6px; border-radius: 8px;
+      color: #ffb86b; border: 1px solid rgba(255, 138, 76, 0.6); background: rgba(255, 138, 76, 0.10);
+    }
+    .eval-fail-card {
+      padding: 8px; margin-bottom: 8px; border: 1px solid rgba(255, 85, 85, 0.25);
+      border-radius: 5px; background: rgba(255, 85, 85, 0.05);
+    }
+    .eval-fail-card .efc-title { color: #ffd27a; font-weight: 700; margin: 2px 0; }
+    .eval-fail-card .efc-line { margin: 3px 0; color: rgba(244, 240, 224, 0.85); }
+    .eval-fail-card .efc-k { color: rgba(255, 176, 0, 0.6); }
+    .eval-meth { font-size: 12px; line-height: 1.6; color: rgba(244, 240, 224, 0.85); }
+    .eval-meth h3 { color: #ffd27a; font-size: 12px; margin: 10px 0 4px; letter-spacing: 1px; }
+    .eval-meth code { background: #1b2230; padding: 0 3px; color: #ffd27a; }
     .ask-empty code { background: #1b2230; padding: 0 3px; color: #ffd27a; }
     .job-score-high { background: #2e8a3e; }   /* >= 75 */
     .job-score-mid  { background: #b8860b; }    /* 50-74 */
@@ -656,9 +705,60 @@
     </div>
   </div>
 
+  <!-- Evaluator popup: the honest eval scorecard (console tier). -->
+  <div id="eval-popup" class="secretary-popup hidden">
+    <div class="secretary-popup-backdrop"></div>
+    <div class="secretary-popup-content">
+      <div class="secretary-popup-header">
+        <h2>EVALUATOR &middot; SCORECARD</h2>
+        <button class="secretary-popup-close" aria-label="Close">×</button>
+      </div>
+      <div class="secretary-popup-tabs">
+        <button class="tab-button active" data-tab="scorecard">Scorecard</button>
+        <button class="tab-button" data-tab="failing">Failing cases</button>
+        <button class="tab-button" data-tab="methodology">Methodology</button>
+      </div>
+      <div class="secretary-popup-body">
+        <div class="tab-panel" data-panel="scorecard">
+          <div class="eval-toolbar">
+            <button id="eval-run-btn" class="eval-run-btn">Run evals</button>
+            <span id="eval-run-note" class="sec-muted"></span>
+          </div>
+          <div class="history-list" id="eval-scorecard"></div>
+        </div>
+        <div class="tab-panel hidden" data-panel="failing">
+          <div class="history-list" id="eval-failing"></div>
+        </div>
+        <div class="tab-panel hidden" data-panel="methodology">
+          <div class="history-list eval-meth" id="eval-methodology">
+            <p>This scorecard is built to survive a skeptical reviewer. Ground truth
+            comes from one of two places, and every check is labelled with which:</p>
+            <h3>COMPUTED FROM ACTIVITY_LOG (objective)</h3>
+            <p>The Secretary groundedness questions have answers computed directly
+            from the SQLite activity data with code. The database is the ground
+            truth, never a model's opinion. We also verify that every source the
+            Secretary cites is a real window with real events; a cited window that
+            does not exist is counted as a hallucination.</p>
+            <h3>MODEL-DRAFTED (OPUS 4.8), CLEAR-CUT</h3>
+            <p>The Job Analyst cases were drafted at full effort by a stronger model
+            (Opus 4.8) judging a weaker one (Haiku). The ground truth is only the
+            expected CATEGORY / band (high / low / filtered / deduped), never a
+            precise model-picked number. Cases are kept clear-cut; any that are not
+            obviously clear-cut are flagged <span class="nr-flag">needs review</span>
+            for a human. A case a human has checked is relabelled
+            <span class="prov-badge prov-human">human-reviewed</span>.</p>
+            <p class="sec-muted">A same-tier model's subjective fine-grained score is
+            never treated as truth.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="/static/secretary.js"></script>
   <script src="/static/job_scout.js"></script>
   <script src="/static/job_analyst.js"></script>
+  <script src="/static/eval.js"></script>
   <script>
     // Cost Today indicator — poll today's LLM spend every 60s (commit 2b).
     function refreshCostIndicator() {
