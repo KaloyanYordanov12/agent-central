@@ -341,6 +341,17 @@
     .job-score-mid  { background: #b8860b; }    /* 50-74 */
     .job-score-low  { background: #a02828; }    /* < 50 */
 
+    /* Public-demo banner — on-theme amber console label, fixed top-center */
+    .public-demo-banner {
+      position: fixed; top: 0; left: 50%; transform: translateX(-50%); z-index: 1000;
+      background: rgba(10, 12, 18, 0.92); color: #ffce5c;
+      border: 1px solid rgba(255, 176, 0, 0.45); border-top: none;
+      border-radius: 0 0 6px 6px;
+      font-family: 'JetBrains Mono', monospace; font-size: 11.5px; letter-spacing: 0.04em;
+      padding: 5px 14px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+    }
+    .public-demo-banner.hidden { display: none; }
+
     /* D1 live activity ticker — a bottom news-crawl narrating real backend events */
     .activity-ticker {
       position: fixed; left: 0; right: 0; bottom: 0; height: 30px; z-index: 900;
@@ -526,6 +537,12 @@
   </style>
 </head>
 <body>
+
+  <!-- Public demo banner: shown only when the server reports public (read-only)
+       mode. Honest label that the demo runs on recorded data with no live spend. -->
+  <div id="public-demo-banner" class="public-demo-banner hidden">
+    Public demo: running on recorded data, no live API calls.
+  </div>
 
   <div class="world-tint" id="world-tint"></div>
   <div class="world-wrapper">
@@ -759,6 +776,42 @@
   <script src="/static/job_scout.js"></script>
   <script src="/static/job_analyst.js"></script>
   <script src="/static/eval.js"></script>
+  <script>
+    // Public demo mode: ask the server (/api/config) whether it is running in
+    // public (read-only) mode. If so, hide the affordances that imply live API
+    // spend — the Evaluator "Run evals" button and the Secretary "Ask" tab — and
+    // show the honest public-demo banner. The Evaluator scorecard still SHOWS the
+    // recorded results, and the Secretary History tab stays fully functional.
+    (function () {
+      fetch("/api/config")
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (cfg) {
+          if (!cfg || !cfg.public_mode) return;
+          document.body.classList.add("public-mode");
+
+          // Hide the Evaluator "Run evals" button + its note (scorecard stays).
+          var runBtn = document.getElementById("eval-run-btn");
+          if (runBtn) runBtn.style.display = "none";
+          var runNote = document.getElementById("eval-run-note");
+          if (runNote) runNote.style.display = "none";
+
+          // Hide the Secretary "Ask" tab button + panel; keep History (Kolio's
+          // decision). The Ask endpoint is also $0-safe server-side as a backstop.
+          document.querySelectorAll('#secretary-popup [data-tab="ask"]').forEach(function (b) {
+            b.style.display = "none";
+          });
+          document.querySelectorAll('#secretary-popup [data-panel="ask"]').forEach(function (p) {
+            p.classList.add("hidden");
+            p.style.display = "none";
+          });
+
+          // Reveal the honest public-demo banner.
+          var banner = document.getElementById("public-demo-banner");
+          if (banner) banner.classList.remove("hidden");
+        })
+        .catch(function () { /* config fetch failed: stay in normal (local) mode */ });
+    })();
+  </script>
   <script>
     // Cost Today indicator — poll today's LLM spend every 60s (commit 2b).
     function refreshCostIndicator() {

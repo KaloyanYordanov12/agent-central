@@ -18,6 +18,14 @@ logger = logging.getLogger(__name__)
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
+# Public (read-only) demo mode. When on, the app runs purely off the recorded
+# data and NEVER spends: no spending background task starts (JobAnalyst,
+# Evaluator auto-eval) and no recorded-data mutator starts (Indexer, JobScout);
+# the two spend-capable endpoints (POST /api/eval/run, the Secretary ask
+# vector+LLM branch) are disabled. The flag-off path (normal local dev) is
+# unchanged. Read once at import; tests patch api.PUBLIC_MODE directly.
+PUBLIC_MODE = os.environ.get("AGENT_CENTRAL_PUBLIC", "").lower() in ("1", "true", "yes")
+
 # Connected WebSocket clients
 _ws_clients: Set[WebSocket] = set()
 
@@ -286,6 +294,19 @@ async def lifespan(app: FastAPI):
     activity_log.init_db(activity_log.DEFAULT_DB_PATH)
     _poller = StatusPoller(broadcast_fn=broadcast)
     await _poller.start()
+    if PUBLIC_MODE:
+        # Public demo: start ONLY the read-only StatusPoller. No spending task
+        # (JobAnalyst, Evaluator auto-eval) and no recorded-data mutator
+        # (Indexer, JobScout) starts, so a visitor cannot make the app spend or
+        # alter the recorded data. The office, HUD, ticker, funnel, and
+        # WebSocket all still run off the recorded activity_log.
+        logger.info("AGENT_CENTRAL_PUBLIC: public mode on; only StatusPoller "
+                    "started (no spending or data-mutating background tasks).")
+        try:
+            yield
+        finally:
+            await _poller.stop()
+        return
     _indexer = IndexerTask(
         activity_db_path=activity_log.DEFAULT_DB_PATH,
         vector_dir=CHROMA_DIR,
@@ -327,6 +348,13 @@ app = FastAPI(title="Agent Central", lifespan=lifespan)
 @app.get("/health")
 def health():
     return {"status": "ok", "agent_count": registry.count()}
+
+
+@app.get("/api/config")
+def get_config():
+    """Public client config so the frontend can adapt (e.g. hide spend
+    affordances and show the public-demo banner when public_mode is on)."""
+    return {"public_mode": PUBLIC_MODE}
 
 
 @app.get("/api/agents")
@@ -432,6 +460,30 @@ async def secretary_ask(payload: AskRequest):
     """Answer a natural-language question about agent activity (RAG)."""
     if not payload.question.strip():
         raise HTTPException(status_code=400, detail="question cannot be empty")
+
+    if PUBLIC_MODE:
+        # Public demo: answer ONLY from the structured path (pure SQL over the
+        # recorded activity_log: no key, no network, no embedding model, no LLM).
+        # Never touch _get_secretary_deps or the vector branch. Semantic
+        # questions (structured returns None) get an honest friendly answer.
+        # The Ask UI is hidden in public mode; this keeps the endpoint $0-safe
+        # even if it is hit directly.
+        from agent_central import structured_qa
+        result = await asyncio.to_thread(
+            structured_qa.structured_answer, payload.question, activity_log._DB_PATH,
+        )
+        if result is not None:
+            return result
+        return {
+            "answer": "The public demo answers from recorded data (counts, "
+                      "recency, which agents were active). Live semantic Q&A is "
+                      "disabled here; try the History tab.",
+            "sources": [],
+            "model": None,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "path": "public-demo",
+        }
 
     try:
         client, embedding_service, vector_index = _get_secretary_deps()
@@ -584,6 +636,12 @@ def eval_scorecard_get():
 @app.post("/api/eval/run")
 async def eval_run():
     """Run the full eval suite once, under the caps, then persist + return it."""
+    if PUBLIC_MODE:
+        # The eval suite spends (Secretary asks + analyst scoring). Refuse before
+        # doing anything so the public demo can never trigger a live API call.
+        raise HTTPException(
+            status_code=403,
+            detail="Running the eval suite is disabled in the public demo.")
     global _eval_running
     if _eval_running:
         raise HTTPException(status_code=409, detail="An eval run is already in progress.")
